@@ -31,28 +31,27 @@ export function CourseDetailRoute() {
 
   const needsFetch = course && course.source !== "custom" && !course.fetchedHolesAt;
 
+  function defaultHoles(): Hole[] {
+    const now = Date.now();
+    return Array.from({ length: course?.holeCount || 18 }, (_, i) => ({ id: `${course!.id}-${i + 1}`, courseId: course!.id, number: i + 1, par: 3, updatedAt: now }));
+  }
+
   async function refetch(force = false) {
     if (!course || course.source === "custom") return;
     setFetching(true);
     setFetchError(null);
+    // Make the course playable right away; a mapped layout replaces these if OpenStreetMap has one.
+    if (holes.length === 0) await saveHoles(course.id, defaultHoles(), false);
     try {
       const found = await fetchCourseHoles(course);
       if (found.length > 0) {
         await saveHoles(course.id, found);
-      } else if (holes.length === 0 || force) {
-        // Nothing mapped: create default holes so a round can start, but keep hole count from tags.
-        const now = Date.now();
-        const defaults: Hole[] = Array.from({ length: course.holeCount || 18 }, (_, i) => ({ id: `${course.id}-${i + 1}`, courseId: course.id, number: i + 1, par: 3, updatedAt: now }));
-        await saveHoles(course.id, holes.length === 0 ? defaults : holes);
+      } else {
+        if (force || !course.fetchedHolesAt) await saveHoles(course.id, holes.length > 0 ? holes : defaultHoles());
         setFetchError("OpenStreetMap has no hole details for this course yet. Pars default to 3. Edit holes to set the real layout.");
       }
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : "Could not load hole details");
-      if (holes.length === 0) {
-        const now = Date.now();
-        const defaults: Hole[] = Array.from({ length: course.holeCount || 18 }, (_, i) => ({ id: `${course.id}-${i + 1}`, courseId: course.id, number: i + 1, par: 3, updatedAt: now }));
-        await saveHoles(course.id, defaults, false);
-      }
     } finally {
       setFetching(false);
     }
