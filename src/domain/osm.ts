@@ -120,6 +120,37 @@ export function parseNearbyCourses(json: OverpassResponse, origin?: LatLon): Nea
   return kept;
 }
 
+/** Merge OSM courses (preferred: may carry hole geometry) with directory courses, deduping by name and proximity. */
+export function mergeCourseLists(osm: NearbyCourse[], directory: NearbyCourse[]): NearbyCourse[] {
+  const out = [...osm];
+  for (const d of directory) {
+    const key = normaliseName(d.name);
+    const dup = out.find((k) => {
+      const kk = normaliseName(k.name);
+      const nameMatch = kk === key || kk.startsWith(key) || key.startsWith(kk) || sharesWords(kk, key);
+      return haversineM(k, d) < (nameMatch ? 2500 : 120);
+    });
+    if (dup) {
+      dup.par ??= d.par;
+      dup.city ??= d.city;
+      dup.website ??= d.website;
+      if (!dup.tags?.["disc_golf:course"] && d.holeCount) dup.holeCount = d.holeCount;
+      continue;
+    }
+    out.push(d);
+  }
+  out.sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0));
+  return out;
+}
+
+const STOP = new Set(["disc", "golf", "course", "dgc", "park", "the", "at", "of", "and", "frisbeegolfrata", "frisbeegolf"]);
+function sharesWords(a: string, b: string): boolean {
+  const wa = a.split(" ").filter((w) => w.length > 2 && !STOP.has(w));
+  const wb = new Set(b.split(" ").filter((w) => w.length > 2 && !STOP.has(w)));
+  const common = wa.filter((w) => wb.has(w)).length;
+  return common >= 2 || (common >= 1 && Math.min(wa.length, wb.size) === 1);
+}
+
 export function parseCourseHoles(json: OverpassResponse, courseId: string): Hole[] {
   const now = Date.now();
   const elements = json.elements ?? [];

@@ -10,7 +10,7 @@ import { Button, Field, PageHeader, Section, Segmented, Toast } from "@/componen
 export function SettingsRoute() {
   const nav = useNavigate();
   const me = useMe();
-  const units = useSetting<Units>("units", "m");
+  const units = useSetting<Units>("units", "ft");
   const satellite = useSetting<boolean>("satellite", false);
   const [theme, setTheme] = useState<ThemePref>(getThemePref());
   const [name, setName] = useState("");
@@ -128,7 +128,7 @@ export function SettingsRoute() {
 
       <Section title="About" className="mt-6 mb-6">
         <p className="text-xs text-ink-3">
-          Course data © OpenStreetMap contributors (ODbL). Basemap by OpenFreeMap. Satellite imagery © Esri and partners. Medisc is an independent project and is not affiliated with UDisc.
+          Course data © OpenStreetMap contributors (ODbL). Course data supplied by DiscGolfAPI. Basemap by OpenFreeMap. Satellite imagery © Esri and partners. Medisc is an independent project and is not affiliated with UDisc.
         </p>
       </Section>
       <Toast message={toast} />

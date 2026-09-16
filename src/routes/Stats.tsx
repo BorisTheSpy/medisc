@@ -248,7 +248,7 @@ export function StatsRoute() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-semibold">{h.name}</div>
-                    <div className="text-xs text-ink-3">{h.rounds} rounds together</div>
+                    <div className="text-xs text-ink-3">{h.rounds === 1 ? "1 round together" : `${h.rounds} rounds together`}</div>
                   </div>
                   <div className="numeric text-right text-sm">
                     <span className="font-bold text-birdie">{h.wins}W</span> <span className="text-ink-3">{h.ties}T</span> <span className="font-bold text-triple">{h.losses}L</span>

@@ -112,7 +112,7 @@ function EditHoles({ courseId }: { courseId: string }) {
   const nav = useNavigate();
   const course = useCourse(courseId);
   const holes = useHoles(courseId);
-  const units = useSetting<Units>("units", "m");
+  const units = useSetting<Units>("units", "ft");
   const satellite = useSetting<boolean>("satellite", false);
   const geo = useGeolocation(false);
   const [selected, setSelected] = useState<number>(1);

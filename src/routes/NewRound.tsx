@@ -14,7 +14,7 @@ export function NewRoundRoute() {
   const me = useMe();
   const players = usePlayers();
   const courses = useCourses();
-  const units = useSetting<Units>("units", "m");
+  const units = useSetting<Units>("units", "ft");
   const [courseId, setCourseId] = useState<string | null>(params.get("course"));
   const course = courses.find((c) => c.id === courseId) ?? null;
   const holes = useHoles(course?.id);

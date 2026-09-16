@@ -21,7 +21,7 @@ export function CourseDetailRoute() {
   const me = useMe();
   const rounds = useRounds();
   const scores = useAllScores();
-  const units = useSetting<Units>("units", "m");
+  const units = useSetting<Units>("units", "ft");
   const satellite = useSetting<boolean>("satellite", false);
   const geo = useGeolocation(false);
   const [fetching, setFetching] = useState(false);
@@ -29,10 +29,10 @@ export function CourseDetailRoute() {
   const [activeHole, setActiveHole] = useState<number | undefined>(undefined);
   const attempted = useRef(false);
 
-  const needsFetch = course && course.source === "osm" && !course.fetchedHolesAt;
+  const needsFetch = course && course.source !== "custom" && !course.fetchedHolesAt;
 
   async function refetch(force = false) {
-    if (!course || course.source !== "osm") return;
+    if (!course || course.source === "custom") return;
     setFetching(true);
     setFetchError(null);
     try {
@@ -135,7 +135,7 @@ export function CourseDetailRoute() {
         {fetchError && (
           <div className="mt-3 rounded-card bg-surface-2 px-4 py-3 text-sm text-ink-2">
             {fetchError}
-            {course.source === "osm" && (
+            {course.source !== "custom" && (
               <button className="ml-2 font-semibold text-birdie" onClick={() => refetch(true)}>
                 Retry
               </button>
@@ -158,7 +158,7 @@ export function CourseDetailRoute() {
         title="Holes"
         className="mt-6"
         action={
-          course.source === "osm" && (
+          course.source !== "custom" && (
             <button className="flex items-center gap-1 text-sm font-semibold text-birdie disabled:opacity-40" onClick={() => refetch(true)} disabled={fetching}>
               <RefreshCw size={14} /> Reload from map
             </button>
@@ -196,7 +196,7 @@ export function CourseDetailRoute() {
         )}
       </Section>
 
-      {(course.website || course.source === "osm") && (
+      {(course.website || course.source !== "custom") && (
         <Section className="mt-6 mb-4">
           <div className="flex flex-wrap gap-3 text-xs text-ink-3">
             {course.website && (
@@ -209,6 +209,7 @@ export function CourseDetailRoute() {
                 Data © OpenStreetMap contributors <ExternalLink size={12} />
               </a>
             )}
+            {course.source === "dga" && <span>Course data supplied by DiscGolfAPI.</span>}
           </div>
         </Section>
       )}

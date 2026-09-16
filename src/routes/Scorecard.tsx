@@ -31,7 +31,7 @@ export function ScorecardRoute() {
   const players = usePlayers();
   const course = useCourse(round?.courseId);
   const holes = useHoles(round?.courseId);
-  const units = useSetting<Units>("units", "m");
+  const units = useSetting<Units>("units", "ft");
   const satellite = useSetting<boolean>("satellite", false);
   const geo = useGeolocation(true);
   const [idx, setIdx] = useState<number>(() => {
@@ -227,7 +227,7 @@ export function ScorecardRoute() {
           })}
         </div>
         <p className="mt-2 px-1 text-xs text-ink-3">
-          {round.trackThrows ? "Tap a name to log where each throw landed. " : ""}First tap on + sets par{par > 1 ? ` minus one` : ""} so a birdie is one tap away.
+          {round.trackThrows ? "Tap a name to log where each throw landed. " : ""}The first tap on + sets par. Adjust from there.
         </p>
       </div>
 

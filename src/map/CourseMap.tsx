@@ -44,9 +44,8 @@ function firstSymbolLayer(map: MLMap): string | undefined {
   return map.getStyle().layers?.find((l) => l.type === "symbol")?.id;
 }
 
-function applySatellite(map: MLMap, on: boolean) {
-  if (!map.isStyleLoaded()) return;
-  if (map.getStyle().layers?.[0]?.id === "satellite" && map.getStyle().layers?.length === 1) return; // fallback style
+function applySatellite(map: MLMap, on: boolean, fallback: boolean) {
+  if (fallback) return; // fallback style is satellite-only already
   if (!map.getSource("satellite")) {
     map.addSource("satellite", { type: "raster", tiles: [SATELLITE_TILES], tileSize: 256, maxzoom: 19, attribution: SATELLITE_ATTRIBUTION });
   }
@@ -72,28 +71,41 @@ function holesGeoJSON(holes: Hole[]): FeatureCollection {
   };
 }
 
+const ACTIVE = "#E9A83A";
+const LINE = "#163A2C";
+
+function lineColor(active?: number) {
+  return ["case", ["==", ["get", "number"], active ?? -1], ACTIVE, LINE] as unknown as string;
+}
+function lineWidth(active?: number, casing = false) {
+  const base = casing ? 5.5 : 3;
+  return ["case", ["==", ["get", "number"], active ?? -1], base + 1.5, base] as unknown as number;
+}
+
 function ensureHoleLayers(map: MLMap, holes: Hole[], active?: number) {
   const data = holesGeoJSON(holes);
   const src = map.getSource("holes") as GeoJSONSource | undefined;
   if (src) src.setData(data);
   else map.addSource("holes", { type: "geojson", data });
-  if (!map.getLayer("holes-line")) {
+  if (!map.getLayer("holes-casing")) {
+    map.addLayer({
+      id: "holes-casing",
+      type: "line",
+      source: "holes",
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": "#FFFFFF", "line-width": lineWidth(active, true), "line-opacity": 0.9 },
+    });
     map.addLayer({
       id: "holes-line",
       type: "line",
       source: "holes",
       layout: { "line-cap": "round", "line-join": "round" },
-      paint: {
-        "line-color": ["case", ["==", ["get", "number"], active ?? -1], "#E9A83A", "#F3F5F1"],
-        "line-width": ["case", ["==", ["get", "number"], active ?? -1], 4, 2.5],
-        "line-opacity": ["case", ["==", ["get", "number"], active ?? -1], 1, 0.75],
-        "line-dasharray": [1.5, 1.5],
-      },
+      paint: { "line-color": lineColor(active), "line-width": lineWidth(active), "line-dasharray": [2, 1.5] },
     });
   } else {
-    map.setPaintProperty("holes-line", "line-color", ["case", ["==", ["get", "number"], active ?? -1], "#E9A83A", "#F3F5F1"]);
-    map.setPaintProperty("holes-line", "line-width", ["case", ["==", ["get", "number"], active ?? -1], 4, 2.5]);
-    map.setPaintProperty("holes-line", "line-opacity", ["case", ["==", ["get", "number"], active ?? -1], 1, 0.75]);
+    map.setPaintProperty("holes-casing", "line-width", lineWidth(active, true));
+    map.setPaintProperty("holes-line", "line-color", lineColor(active));
+    map.setPaintProperty("holes-line", "line-width", lineWidth(active));
   }
 }
 
@@ -102,7 +114,7 @@ export function CourseMap({ center, holes = [], activeHole, user, satellite = fa
   const mapRef = useRef<MLMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
   const userRef = useRef<Marker | null>(null);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(0);
   const [failed, setFailed] = useState<string | null>(null);
   const styleFailed = useRef(false);
   const onMapClickRef = useRef(onMapClick);
@@ -129,21 +141,28 @@ export function CourseMap({ center, holes = [], activeHole, user, satellite = fa
       return;
     }
     mapRef.current = map;
+    (containerRef.current as HTMLDivElement & { __map?: MLMap }).__map = map;
     map.touchZoomRotate.disableRotation();
+    let styleLoaded = false;
     map.on("error", (e) => {
       const msg = String(e.error?.message ?? "");
-      if (!styleFailed.current && !map.isStyleLoaded() && /style|json|fetch|network/i.test(msg)) {
+      const w = window as Window & { __mapErrors?: string[] };
+      (w.__mapErrors ??= []).push(msg);
+      // Only fall back if the style document itself failed, never for individual tiles.
+      if (!styleFailed.current && !styleLoaded && /style/i.test(msg)) {
         styleFailed.current = true;
         map.setStyle(FALLBACK_STYLE);
       }
     });
-    map.on("load", () => setReady(true));
-    map.on("style.load", () => setReady(true));
+    map.on("style.load", () => {
+      styleLoaded = true;
+      setReady((n) => n + 1);
+    });
     map.on("click", (e) => onMapClickRef.current?.({ lat: e.lngLat.lat, lon: e.lngLat.lng }));
     return () => {
       map.remove();
       mapRef.current = null;
-      setReady(false);
+      setReady(0);
     };
     // Center changes are handled by fit logic; only mount once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -152,7 +171,7 @@ export function CourseMap({ center, holes = [], activeHole, user, satellite = fa
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    applySatellite(map, satellite);
+    applySatellite(map, satellite, styleFailed.current);
   }, [satellite, ready]);
 
   useEffect(() => {
@@ -302,13 +321,17 @@ export function PinMap({ center, pins, user, onPinClick, className, radiusM }: P
     }
     mapRef.current = map;
     let styleFailed = false;
+    let styleLoaded = false;
     map.on("error", (e) => {
-      if (!styleFailed && !map.isStyleLoaded() && /style|json|fetch|network/i.test(String(e.error?.message ?? ""))) {
+      if (!styleFailed && !styleLoaded && /style/i.test(String(e.error?.message ?? ""))) {
         styleFailed = true;
         map.setStyle(FALLBACK_STYLE);
       }
     });
-    map.on("load", () => setReady(true));
+    map.on("style.load", () => {
+      styleLoaded = true;
+      setReady(true);
+    });
     return () => {
       map.remove();
       mapRef.current = null;

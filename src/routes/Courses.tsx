@@ -9,7 +9,7 @@ import type { LatLon } from "@/domain/types";
 import { formatDistance, haversineM, type Units } from "@/domain/geo";
 import { upsertCourse, getSetting, setSetting } from "@/db/repo";
 import { useCourses, useSetting } from "@/db/hooks";
-import { Button, Chip, EmptyState, Field, IconButton, PageHeader, Segmented, Spinner, cx } from "@/components/ui";
+import { Button, Chip, EmptyState, Field, IconButton, PageHeader, Segmented, Spinner } from "@/components/ui";
 import { PinMap } from "@/map/CourseMap";
 
 const RADII = [
@@ -22,7 +22,7 @@ const RADII = [
 export function CoursesRoute() {
   const nav = useNavigate();
   const geo = useGeolocation(false);
-  const units = useSetting<Units>("units", "m");
+  const units = useSetting<Units>("units", "ft");
   const savedCourses = useCourses();
   const [radiusKm, setRadiusKm] = useState(25);
   const [view, setView] = useState<"list" | "map">("list");
@@ -260,6 +260,7 @@ export function CoursesRoute() {
                       {c.fee === "yes" && <span>pay to play</span>}
                       {c.access === "private" || c.access === "permit" ? <span>restricted</span> : null}
                       {c.source === "custom" && <span>your course</span>}
+                      {c.region && <span>{c.region}</span>}
                     </div>
                   </div>
                   {c.distanceM !== undefined && <div className="numeric text-sm font-semibold text-ink-2">{formatDistance(c.distanceM, units)}</div>}
@@ -269,19 +270,19 @@ export function CoursesRoute() {
           )}
           {courses && (
             <p className="mt-3 text-center text-[11px] text-ink-3">
-              {fromCache ? "From your last search. " : ""}Course data © OpenStreetMap contributors.
+              {fromCache ? "From your last search. " : ""}Course data © OpenStreetMap contributors. Course data supplied by DiscGolfAPI.
             </p>
           )}
         </div>
       )}
 
-      <button
-        onClick={() => nav("/courses/new")}
-        className={cx("fixed bottom-20 right-4 z-20 flex h-14 items-center gap-2 rounded-full bg-accent px-5 font-bold text-accent-ink shadow-card", "safe-bottom")}
-        style={{ marginBottom: "env(safe-area-inset-bottom)" }}
-      >
-        <Plus size={20} /> Add course
-      </button>
+      <div className="pointer-events-none fixed inset-x-0 bottom-20 z-20 flex justify-center px-4" style={{ marginBottom: "env(safe-area-inset-bottom)" }}>
+        <div className="flex w-full max-w-[448px] justify-end">
+          <button onClick={() => nav("/courses/new")} className="pointer-events-auto flex h-14 items-center gap-2 rounded-full bg-accent px-5 font-bold text-accent-ink shadow-card">
+            <Plus size={20} /> Add course
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

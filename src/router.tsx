@@ -1,16 +1,36 @@
+import { lazy, Suspense, type ComponentType } from "react";
 import { createBrowserRouter } from "react-router";
 import { AppShell } from "./components/AppShell";
 import { HomeRoute } from "./routes/Home";
-import { CoursesRoute } from "./routes/Courses";
-import { CourseDetailRoute } from "./routes/CourseDetail";
-import { CourseEditRoute } from "./routes/CourseEdit";
-import { NewRoundRoute } from "./routes/NewRound";
-import { ScorecardRoute } from "./routes/Scorecard";
-import { RoundSummaryRoute } from "./routes/RoundSummary";
 import { RoundsRoute } from "./routes/Rounds";
-import { StatsRoute } from "./routes/Stats";
+import { RoundSummaryRoute } from "./routes/RoundSummary";
 import { SettingsRoute } from "./routes/Settings";
 import { NotFoundRoute } from "./routes/NotFound";
+import { Spinner } from "./components/ui";
+
+function lazyRoute(loader: () => Promise<{ [k: string]: ComponentType }>, name: string) {
+  const C = lazy(() => loader().then((m) => ({ default: m[name] })));
+  return function LazyRoute() {
+    return (
+      <Suspense
+        fallback={
+          <div className="grid min-h-dvh place-items-center">
+            <Spinner />
+          </div>
+        }
+      >
+        <C />
+      </Suspense>
+    );
+  };
+}
+
+const CoursesRoute = lazyRoute(() => import("./routes/Courses"), "CoursesRoute");
+const CourseDetailRoute = lazyRoute(() => import("./routes/CourseDetail"), "CourseDetailRoute");
+const CourseEditRoute = lazyRoute(() => import("./routes/CourseEdit"), "CourseEditRoute");
+const NewRoundRoute = lazyRoute(() => import("./routes/NewRound"), "NewRoundRoute");
+const ScorecardRoute = lazyRoute(() => import("./routes/Scorecard"), "ScorecardRoute");
+const StatsRoute = lazyRoute(() => import("./routes/Stats"), "StatsRoute");
 
 export const router = createBrowserRouter([
   {

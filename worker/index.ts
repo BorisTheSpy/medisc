@@ -88,6 +88,81 @@ app.post("/api/overpass", async (c) => {
   }
 });
 
+// US course directory from DiscGolfAPI (free with attribution). Cached for a day, filtered by radius here
+// so the phone never downloads the 4.5 MB national list.
+const DGA_URL = "https://io.discgolfapi.com/v1/courses?country=US&limit=10000";
+const DGA_TTL_SECONDS = 86_400;
+
+interface DgaCourse {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  locality?: string | null;
+  region_code?: string | null;
+  website?: string | null;
+  holes?: number | null;
+  operational_status?: string | null;
+  existence_status?: string | null;
+  access_model?: string | null;
+  primary_layout?: { par_total?: number | null; length_meters?: number | null } | null;
+}
+
+function haversineM(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371e3;
+  const p1 = (lat1 * Math.PI) / 180;
+  const p2 = (lat2 * Math.PI) / 180;
+  const dp = ((lat2 - lat1) * Math.PI) / 180;
+  const dl = ((lon2 - lon1) * Math.PI) / 180;
+  const h = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+async function loadUsCourses(ctx: { waitUntil(p: Promise<unknown>): void }): Promise<DgaCourse[]> {
+  const cache = caches.default;
+  const key = new Request("https://medisc.cache/dga/us");
+  const hit = await cache.match(key);
+  if (hit) return (await hit.json()) as DgaCourse[];
+  const res = await fetch(DGA_URL, { headers: { Accept: "application/json", "User-Agent": "medisc/0.1" } });
+  if (!res.ok) throw new Error(`DiscGolfAPI responded ${res.status}`);
+  const json = (await res.json()) as { courses: DgaCourse[] };
+  const slim = json.courses
+    .filter((c) => typeof c.lat === "number" && typeof c.lon === "number" && c.existence_status !== "closed" && c.existence_status !== "removed")
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      lat: c.lat,
+      lon: c.lon,
+      locality: c.locality ?? null,
+      region_code: c.region_code ?? null,
+      website: c.website ?? null,
+      holes: c.holes ?? null,
+      operational_status: c.operational_status ?? null,
+      access_model: c.access_model ?? null,
+      primary_layout: c.primary_layout ? { par_total: c.primary_layout.par_total ?? null, length_meters: c.primary_layout.length_meters ?? null } : null,
+    }));
+  ctx.waitUntil(cache.put(key, new Response(JSON.stringify(slim), { headers: { "Content-Type": "application/json", "Cache-Control": `public, max-age=${DGA_TTL_SECONDS}` } })));
+  return slim;
+}
+
+app.get("/api/courses/us", async (c) => {
+  const lat = Number(c.req.query("lat"));
+  const lon = Number(c.req.query("lon"));
+  const radius = Math.min(Number(c.req.query("radius") ?? 25_000), 250_000);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return c.json({ error: "lat and lon are required" }, 400);
+  try {
+    const all = await loadUsCourses(c.executionCtx);
+    const near = all
+      .map((x) => ({ ...x, distanceM: haversineM(lat, lon, x.lat, x.lon) }))
+      .filter((x) => x.distanceM <= radius)
+      .sort((a, b) => a.distanceM - b.distanceM)
+      .slice(0, 200);
+    return c.json({ attribution: "Course data supplied by DiscGolfAPI.", courses: near }, 200, { "Cache-Control": "public, max-age=3600" });
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : "Course directory unavailable" }, 502);
+  }
+});
+
 app.notFound((c) => c.json({ error: "Not found" }, 404));
 
 export default app;
