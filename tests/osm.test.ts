@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
-import nearby from "./fixtures/nearby-helsinki.json";
-import holes from "./fixtures/holes-paloheina.json";
-import { parseNearbyCourses, parseCourseHoles, nearbyQuery, courseHolesQuery, parseHoleCount, parseLengthM } from "../src/domain/osm";
+import nearbyJson from "./fixtures/nearby-helsinki.json";
+import holesJson from "./fixtures/holes-paloheina.json";
+const nearby = nearbyJson as unknown as OverpassResponse;
+const holes = holesJson as unknown as OverpassResponse;
+import { parseNearbyCourses, parseCourseHoles, nearbyQuery, courseHolesQuery, parseHoleCount, parseLengthM, type OverpassResponse } from "../src/domain/osm";
 import type { Course } from "../src/domain/types";
 
 describe("osm nearby", () => {

@@ -11,8 +11,7 @@
     "isolatedModules": true,
     "resolveJsonModule": true,
     "types": ["vite/client", "vite-plugin-pwa/client"],
-    "baseUrl": ".",
-    "paths": { "@/*": ["src/*"] }
+    "paths": { "@/*": ["./src/*"] }
   },
   "include": ["src", "tests", "vite.config.ts"]
 }
