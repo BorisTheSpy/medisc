@@ -77,7 +77,13 @@ export function CoursesRoute() {
       setError(null);
       if (!force) setCourses(null);
       try {
-        const res = await fetchNearbyCourses(origin, radiusMi * MILE, { force, signal: controller.signal });
+        const res = await fetchNearbyCourses(origin, radiusMi * MILE, {
+          force,
+          signal: controller.signal,
+          onUpdate: (partial) => {
+            if (!controller.signal.aborted) setCourses(partial);
+          },
+        });
         setCourses(res.courses);
         setFromCache(res.fromCache);
       } catch (err) {
@@ -309,6 +315,11 @@ export function CoursesRoute() {
               <button className="ml-2 font-semibold text-birdie" onClick={() => load(true)}>
                 Retry
               </button>
+            </div>
+          )}
+          {loading && courses && courses.length > 0 && (
+            <div className="mb-2 flex items-center gap-2 text-xs text-ink-3">
+              <Spinner className="h-3.5 w-3.5" /> Checking OpenStreetMap for more…
             </div>
           )}
           {loading && !courses && (

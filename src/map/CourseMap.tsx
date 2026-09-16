@@ -8,7 +8,7 @@ import { cx } from "@/components/ui";
 
 setWorkerUrl(workerUrl);
 
-export const BASEMAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
+export const BASEMAP_STYLE = "https://tiles.openfreemap.org/styles/positron";
 const SATELLITE_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 const SATELLITE_ATTRIBUTION = "Imagery © Esri, Maxar, Earthstar Geographics";
 
@@ -347,14 +347,11 @@ export function PinMap({ center, pins, user, onPinClick, className, radiusM }: P
     const b = new LngLatBounds();
     for (const p of pins) {
       const el = document.createElement("button");
-      el.className = cx("hole-marker", p.active ? "tee active" : "basket");
-      el.style.width = "30px";
-      el.style.height = "30px";
-      el.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></svg>';
+      el.className = "course-pin";
       el.setAttribute("aria-label", p.label);
       el.title = p.label;
       el.addEventListener("click", () => onPinClickRef.current?.(p.id));
-      markersRef.current.push(new Marker({ element: el }).setLngLat([p.lon, p.lat]).addTo(map));
+      markersRef.current.push(new Marker({ element: el, anchor: "bottom", offset: [0, 4] }).setLngLat([p.lon, p.lat]).addTo(map));
       b.extend([p.lon, p.lat]);
     }
     if (user) b.extend([user.lon, user.lat]);

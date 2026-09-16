@@ -41,7 +41,11 @@ export function ScorecardRoute() {
       return 0;
     }
   });
-  const [showMap, setShowMap] = useState(true);
+  const [mapPref, setMapPref] = useState<boolean | null>(null);
+  const anyMapped = holes.some((h) => h.tee || h.basket);
+  // Default: show the map only when the course actually has hole positions.
+  const showMap = mapPref ?? anyMapped;
+  const setShowMap = (v: boolean | ((prev: boolean) => boolean)) => setMapPref(typeof v === "function" ? v(showMap) : v);
   const [menuOpen, setMenuOpen] = useState(false);
   const [parOpen, setParOpen] = useState(false);
   const [playersOpen, setPlayersOpen] = useState(false);
@@ -213,7 +217,7 @@ export function ScorecardRoute() {
                     </div>
                   </div>
                 </button>
-                <button aria-label={`Remove a stroke for ${p.name}`} onClick={() => adjustStrokes(s.id, -1)} disabled={s.strokes <= 0} className="grid h-12 w-12 place-items-center rounded-full bg-surface-2 text-ink active:bg-surface-3 disabled:opacity-30">
+                <button aria-label={`Remove a stroke for ${p.name}`} onClick={() => adjustStrokes(s.id, -1)} disabled={s.strokes === 1} className="grid h-12 w-12 place-items-center rounded-full bg-surface-2 text-ink active:bg-surface-3 disabled:opacity-30">
                   <Minus size={22} />
                 </button>
                 <div className={cx("display numeric w-12 text-center text-[36px]", label === "birdie" || label === "eagle" || label === "ace" ? "text-birdie" : label === "bogey" || label === "double" || label === "triple" ? "text-triple" : "")} aria-live="polite" aria-label={`${p.name} strokes`}>
@@ -227,7 +231,7 @@ export function ScorecardRoute() {
           })}
         </div>
         <p className="mt-2 px-1 text-xs text-ink-3">
-          {round.trackThrows ? "Tap a name to log where each throw landed. " : ""}The first tap on + sets par. Adjust from there.
+          {round.trackThrows ? "Tap a name to log where each throw landed. " : ""}On a new hole, + sets par and − sets a birdie. Then each tap moves one stroke.
         </p>
       </div>
 

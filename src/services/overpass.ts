@@ -68,15 +68,34 @@ export interface NearbyResult {
   fetchedAt: number;
 }
 
-export async function fetchNearbyCourses(center: LatLon, radiusM: number, opts: { force?: boolean; signal?: AbortSignal } = {}): Promise<NearbyResult> {
+export async function fetchNearbyCourses(
+  center: LatLon,
+  radiusM: number,
+  opts: { force?: boolean; signal?: AbortSignal; onUpdate?: (courses: NearbyCourse[]) => void } = {},
+): Promise<NearbyResult> {
   const key = cacheKey(center, radiusM);
   const cached = await db.overpassCache.get(key);
-  const usPromise = fetchUsCourses(center, radiusM, opts.signal).catch(() => [] as NearbyCourse[]);
+  const cachedFresh = !!cached && !opts.force && Date.now() - cached.fetchedAt < NEARBY_TTL;
 
-  if (cached && !opts.force && Date.now() - cached.fetchedAt < NEARBY_TTL) {
-    const osm = parseNearbyCourses(cached.json as OverpassResponse, center);
-    return { courses: mergeCourseLists(osm, await usPromise), fromCache: true, fetchedAt: cached.fetchedAt };
+  // The US directory answers in well under a second; deliver it as soon as it lands.
+  let us: NearbyCourse[] = [];
+  const usPromise = fetchUsCourses(center, radiusM, opts.signal)
+    .catch(() => [] as NearbyCourse[])
+    .then((list) => {
+      us = list;
+      if (!opts.signal?.aborted && list.length > 0) {
+        const osmNow = cachedFresh ? parseNearbyCourses(cached!.json as OverpassResponse, center) : [];
+        opts.onUpdate?.(mergeCourseLists(osmNow, list));
+      }
+      return list;
+    });
+
+  if (cachedFresh) {
+    const osm = parseNearbyCourses(cached!.json as OverpassResponse, center);
+    await usPromise;
+    return { courses: mergeCourseLists(osm, us), fromCache: true, fetchedAt: cached!.fetchedAt };
   }
+
   let osm: NearbyCourse[] | null = null;
   let osmError: unknown = null;
   try {
@@ -87,7 +106,7 @@ export async function fetchNearbyCourses(center: LatLon, radiusM: number, opts: 
     osmError = err;
     if (cached) osm = parseNearbyCourses(cached.json as OverpassResponse, center);
   }
-  const us = await usPromise;
+  await usPromise;
   if (osm === null && us.length === 0) throw osmError instanceof Error ? osmError : new OverpassError("Course search is unavailable right now");
   return { courses: mergeCourseLists(osm ?? [], us), fromCache: osm !== null && osmError !== null, fetchedAt: Date.now() };
 }

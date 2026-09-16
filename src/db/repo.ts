@@ -166,11 +166,15 @@ export async function setStrokes(scoreId: string, strokes: number): Promise<void
   await db.holeScores.update(scoreId, { strokes: next, throws: undefined, penalties: 0, updatedAt: Date.now() });
 }
 
+/** From an unscored hole, + sets par and − sets one under par. After that, each tap moves by one. */
 export async function adjustStrokes(scoreId: string, delta: number): Promise<void> {
   const s = await db.holeScores.get(scoreId);
   if (!s) return;
-  const base = s.strokes === 0 && delta > 0 ? s.par - 1 : s.strokes;
-  await setStrokes(scoreId, base + delta);
+  if (s.strokes === 0) {
+    await setStrokes(scoreId, delta > 0 ? s.par : Math.max(1, s.par - 1));
+    return;
+  }
+  await setStrokes(scoreId, Math.max(1, s.strokes + delta));
 }
 
 export async function setThrows(scoreId: string, throws: Zone[]): Promise<void> {
