@@ -145,18 +145,34 @@ async function loadUsCourses(ctx: { waitUntil(p: Promise<unknown>): void }): Pro
   return slim;
 }
 
+function normalise(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
 app.get("/api/courses/us", async (c) => {
   const lat = Number(c.req.query("lat"));
   const lon = Number(c.req.query("lon"));
   const radius = Math.min(Number(c.req.query("radius") ?? 25_000), 250_000);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return c.json({ error: "lat and lon are required" }, 400);
+  const q = normalise(c.req.query("q") ?? "");
+  const hasOrigin = Number.isFinite(lat) && Number.isFinite(lon);
+  if (!hasOrigin && !q) return c.json({ error: "lat and lon, or q, are required" }, 400);
   try {
     const all = await loadUsCourses(c.executionCtx);
-    const near = all
-      .map((x) => ({ ...x, distanceM: haversineM(lat, lon, x.lat, x.lon) }))
-      .filter((x) => x.distanceM <= radius)
-      .sort((a, b) => a.distanceM - b.distanceM)
-      .slice(0, 200);
+    let near = all.map((x) => ({ ...x, distanceM: hasOrigin ? haversineM(lat, lon, x.lat, x.lon) : Number.NaN }));
+    if (q) {
+      const words = q.split(" ").filter(Boolean);
+      near = near.filter((x) => {
+        const hay = normalise(`${x.name} ${x.locality ?? ""} ${x.region_code ?? ""}`);
+        return words.every((w) => hay.includes(w));
+      });
+      near.sort((a, b) => (Number.isNaN(a.distanceM) ? 0 : a.distanceM) - (Number.isNaN(b.distanceM) ? 0 : b.distanceM));
+      near = near.slice(0, 40);
+    } else {
+      near = near
+        .filter((x) => x.distanceM <= radius)
+        .sort((a, b) => a.distanceM - b.distanceM)
+        .slice(0, 200);
+    }
     return c.json({ attribution: "Course data supplied by DiscGolfAPI.", courses: near }, 200, { "Cache-Control": "public, max-age=3600" });
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : "Course directory unavailable" }, 502);

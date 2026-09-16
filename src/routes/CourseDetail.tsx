@@ -5,7 +5,7 @@ import { useAllScores, useCourse, useHoles, useMe, useRounds, useSetting } from 
 import { fetchCourseHoles } from "@/services/overpass";
 import { saveHoles, setSetting } from "@/db/repo";
 import { useGeolocation } from "@/services/useGeolocation";
-import { formatDistance, type Units } from "@/domain/geo";
+import { formatHoleDistance, type Units } from "@/domain/geo";
 import { holeStatsForCourse, perCourse } from "@/domain/stats";
 import { formatToPar } from "@/domain/scoring";
 import { avg } from "@/lib/format";
@@ -91,7 +91,7 @@ export function CourseDetailRoute() {
     <div>
       <PageHeader
         title={course.name}
-        sub={[course.city, `${holes.length || course.holeCount} holes`, totalPar ? `par ${totalPar}` : null, totalLen ? formatDistance(totalLen, units) : null].filter(Boolean).join(" · ")}
+        sub={[course.city, `${holes.length || course.holeCount} holes`, totalPar ? `par ${totalPar}` : null, totalLen ? formatHoleDistance(totalLen, units) : null].filter(Boolean).join(" · ")}
         back={() => nav(-1)}
         right={
           <IconButton label="Edit holes" onClick={() => nav(`/courses/${course.id}/edit`)}>
@@ -185,7 +185,7 @@ export function CourseDetailRoute() {
                 >
                   <span className="display numeric text-lg">{h.number}</span>
                   <span className="numeric text-ink-2">{h.par}</span>
-                  <span className="numeric text-right text-ink-2">{h.distanceM ? formatDistance(h.distanceM, units) : "–"}</span>
+                  <span className="numeric text-right text-ink-2">{h.distanceM ? formatHoleDistance(h.distanceM, units) : "–"}</span>
                   <span className={cx("numeric text-right", hs && hs.avgToPar < 0 ? "text-birdie" : hs && hs.avgToPar > 0.5 ? "text-triple" : "text-ink-2")}>{hs ? hs.avgStrokes.toFixed(1) : "–"}</span>
                   <span className="numeric text-right text-ink-2">{hs ? hs.best : "–"}</span>
                 </button>

@@ -2,58 +2,58 @@
 @import "maplibre-gl/dist/maplibre-gl.css" layer(base);
 
 :root {
-  --bg: #f3f5f1;
+  --bg: #f3f6fa;
   --surface: #ffffff;
-  --surface-2: #e8ece5;
-  --surface-3: #dde3d9;
-  --ink: #14201a;
-  --ink-2: #4b5a50;
-  --ink-3: #7f8f82;
-  --line: rgba(20, 32, 26, 0.1);
-  --line-strong: rgba(20, 32, 26, 0.22);
-  --brand: #163a2c;
-  --brand-2: #1f4d3b;
-  --brand-ink: #f3f5f1;
+  --surface-2: #e7edf5;
+  --surface-3: #d9e2ee;
+  --ink: #121c2b;
+  --ink-2: #4a5a72;
+  --ink-3: #7c8aa3;
+  --line: rgba(18, 28, 43, 0.1);
+  --line-strong: rgba(18, 28, 43, 0.22);
+  --brand: #1b3f7a;
+  --brand-2: #26518f;
+  --brand-ink: #f3f6fa;
   --accent: #e9a83a;
   --accent-2: #f2c063;
   --accent-ink: #14201a;
   --danger: #c4553b;
   --danger-ink: #ffffff;
   --ace: #2fa37e;
-  --eagle: #27558f;
-  --birdie: #3f75ba;
-  --birdie-soft: #dbe6f5;
+  --eagle: #1f7a5c;
+  --birdie: #3a9d7c;
+  --birdie-soft: #d9efe6;
   --bogey: #f6cfae;
   --double: #ee9a61;
   --triple: #d5612b;
   --map-tee: #e9a83a;
-  --map-basket: #f3f5f1;
-  --shadow: 0 1px 2px rgba(20, 32, 26, 0.06), 0 8px 24px -12px rgba(20, 32, 26, 0.18);
+  --map-basket: #f3f6fa;
+  --shadow: 0 1px 2px rgba(18, 28, 43, 0.06), 0 8px 24px -12px rgba(18, 28, 43, 0.18);
   color-scheme: light;
 }
 
 :root[data-theme="dark"] {
-  --bg: #0f1f18;
-  --surface: #17271f;
-  --surface-2: #213328;
-  --surface-3: #2b4033;
-  --ink: #eef2ea;
-  --ink-2: #b4c0b3;
-  --ink-3: #7f8f82;
-  --line: rgba(238, 242, 234, 0.1);
-  --line-strong: rgba(238, 242, 234, 0.24);
-  --brand: #1e4d3a;
-  --brand-2: #276249;
-  --brand-ink: #f3f5f1;
+  --bg: #0e1b2e;
+  --surface: #16243a;
+  --surface-2: #1f3050;
+  --surface-3: #2a3f63;
+  --ink: #edf2f9;
+  --ink-2: #b3c0d4;
+  --ink-3: #7f8fa8;
+  --line: rgba(237, 242, 249, 0.1);
+  --line-strong: rgba(237, 242, 249, 0.24);
+  --brand: #1f4a8c;
+  --brand-2: #2a5ca8;
+  --brand-ink: #f3f6fa;
   --accent: #f0b44c;
   --accent-2: #f6c96f;
   --accent-ink: #14201a;
   --danger: #e0755c;
   --danger-ink: #14201a;
   --ace: #3dbb92;
-  --eagle: #4a7bbf;
-  --birdie: #6d9bd9;
-  --birdie-soft: #24384f;
+  --eagle: #2f9c78;
+  --birdie: #55c49d;
+  --birdie-soft: #1d3d33;
   --bogey: #8a5a3e;
   --double: #b96a3b;
   --triple: #d97a3a;
@@ -63,27 +63,27 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0f1f18;
-    --surface: #17271f;
-    --surface-2: #213328;
-    --surface-3: #2b4033;
-    --ink: #eef2ea;
-    --ink-2: #b4c0b3;
-    --ink-3: #7f8f82;
-    --line: rgba(238, 242, 234, 0.1);
-    --line-strong: rgba(238, 242, 234, 0.24);
-    --brand: #1e4d3a;
-    --brand-2: #276249;
-    --brand-ink: #f3f5f1;
+    --bg: #0e1b2e;
+    --surface: #16243a;
+    --surface-2: #1f3050;
+    --surface-3: #2a3f63;
+    --ink: #edf2f9;
+    --ink-2: #b3c0d4;
+    --ink-3: #7f8fa8;
+    --line: rgba(237, 242, 249, 0.1);
+    --line-strong: rgba(237, 242, 249, 0.24);
+    --brand: #1f4a8c;
+    --brand-2: #2a5ca8;
+    --brand-ink: #f3f6fa;
     --accent: #f0b44c;
     --accent-2: #f6c96f;
     --accent-ink: #14201a;
     --danger: #e0755c;
     --danger-ink: #14201a;
     --ace: #3dbb92;
-    --eagle: #4a7bbf;
-    --birdie: #6d9bd9;
-    --birdie-soft: #24384f;
+    --eagle: #2f9c78;
+    --birdie: #55c49d;
+    --birdie-soft: #1d3d33;
     --bogey: #8a5a3e;
     --double: #b96a3b;
     --triple: #d97a3a;
@@ -225,8 +225,8 @@ textarea {
 }
 
 .hole-marker.basket {
-  background: #163a2c;
-  color: #f3f5f1;
+  background: #1b3f7a;
+  color: #f3f6fa;
 }
 
 .hole-marker.active {
@@ -238,7 +238,7 @@ textarea {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #3f75ba;
+  background: #e9a83a;
   border: 3px solid #fff;
-  box-shadow: 0 0 0 2px rgba(63, 117, 186, 0.35), 0 1px 4px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 0 2px rgba(233, 168, 58, 0.4), 0 1px 4px rgba(0, 0, 0, 0.4);
 }

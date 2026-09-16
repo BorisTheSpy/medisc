@@ -6,7 +6,7 @@ import { createCustomCourse, getSetting, saveHoles, setSetting, updateHole } fro
 import { db } from "@/db/db";
 import { useGeolocation } from "@/services/useGeolocation";
 import { searchPlace, type Place } from "@/services/nominatim";
-import { formatDistance, haversineM, type Units } from "@/domain/geo";
+import { formatHoleDistance, haversineM, type Units } from "@/domain/geo";
 import type { Hole, LatLon } from "@/domain/types";
 import { Button, Field, PageHeader, Section, Spinner, cx } from "@/components/ui";
 import { CourseMap } from "@/map/CourseMap";
@@ -213,7 +213,7 @@ function EditHoles({ courseId }: { courseId: string }) {
           <div className="grid grid-cols-[3rem_1fr_1fr_5rem] items-center border-b hairline px-3 py-2 text-[11px] font-semibold text-ink-3">
             <span>Hole</span>
             <span>Par</span>
-            <span>Length ({units})</span>
+            <span>Length ({units === "ft" ? "ft" : "m"})</span>
             <span className="text-right">Pins</span>
           </div>
           {holes.map((h) => (
@@ -239,7 +239,7 @@ function EditHoles({ courseId }: { courseId: string }) {
                 key={`${h.id}-${units}-${h.distanceM ?? ""}`}
                 onBlur={(e) => e.target.value && setLength(h, e.target.value)}
               />
-              <span className="text-right text-xs text-ink-3">{h.tee && h.basket ? formatDistance(h.distanceM ?? 0, units) : h.tee ? "tee set" : "—"}</span>
+              <span className="text-right text-xs text-ink-3">{h.tee && h.basket ? formatHoleDistance(h.distanceM ?? 0, units) : h.tee ? "tee set" : "—"}</span>
             </div>
           ))}
         </div>

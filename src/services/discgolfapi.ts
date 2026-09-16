@@ -20,7 +20,20 @@ export const DGA_ATTRIBUTION = "Course data supplied by DiscGolfAPI.";
 
 /** US course directory via the Worker. Returns [] outside the US or when the Worker is unavailable. */
 export async function fetchUsCourses(center: LatLon, radiusM: number, signal?: AbortSignal): Promise<NearbyCourse[]> {
-  const url = `/api/courses/us?lat=${center.lat.toFixed(5)}&lon=${center.lon.toFixed(5)}&radius=${Math.round(radiusM)}`;
+  return request(`/api/courses/us?lat=${center.lat.toFixed(5)}&lon=${center.lon.toFixed(5)}&radius=${Math.round(radiusM)}`, signal);
+}
+
+/** Name search across the whole US directory, nearest first when an origin is known. */
+export async function searchUsCoursesByName(q: string, center: LatLon | null, signal?: AbortSignal): Promise<NearbyCourse[]> {
+  const params = new URLSearchParams({ q });
+  if (center) {
+    params.set("lat", center.lat.toFixed(5));
+    params.set("lon", center.lon.toFixed(5));
+  }
+  return request(`/api/courses/us?${params.toString()}`, signal);
+}
+
+async function request(url: string, signal?: AbortSignal): Promise<NearbyCourse[]> {
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`US course directory responded ${res.status}`);
   const json = (await res.json()) as { courses: DgaRow[] };
@@ -42,7 +55,7 @@ export async function fetchUsCourses(center: LatLon, radiusM: number, signal?: A
       createdAt: now,
       updatedAt: now,
     };
-    course.distanceM = r.distanceM;
+    if (Number.isFinite(r.distanceM)) course.distanceM = r.distanceM;
     return course;
   });
 }

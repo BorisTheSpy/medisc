@@ -71,8 +71,8 @@ export function SettingsRoute() {
               value={units}
               onChange={(v) => setSetting("units", v)}
               options={[
+                { value: "ft", label: "Feet & miles" },
                 { value: "m", label: "Metres" },
-                { value: "ft", label: "Feet" },
               ]}
             />
           </Row>

@@ -1,7 +1,7 @@
 import { db } from "@/db/db";
 import type { Course, LatLon } from "@/domain/types";
-import { nearbyQuery, courseHolesQuery, parseNearbyCourses, parseCourseHoles, mergeCourseLists, type OverpassResponse, type NearbyCourse } from "@/domain/osm";
-import { fetchUsCourses } from "./discgolfapi";
+import { nearbyQuery, nameQuery, courseHolesQuery, parseNearbyCourses, parseCourseHoles, mergeCourseLists, type OverpassResponse, type NearbyCourse } from "@/domain/osm";
+import { fetchUsCourses, searchUsCoursesByName } from "./discgolfapi";
 
 const DIRECT_ENDPOINTS = [
   "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
@@ -90,6 +90,18 @@ export async function fetchNearbyCourses(center: LatLon, radiusM: number, opts: 
   const us = await usPromise;
   if (osm === null && us.length === 0) throw osmError instanceof Error ? osmError : new OverpassError("Course search is unavailable right now");
   return { courses: mergeCourseLists(osm ?? [], us), fromCache: osm !== null && osmError !== null, fetchedAt: Date.now() };
+}
+
+/** Search courses by name: the whole US directory plus OpenStreetMap within 125 miles of the origin. */
+export async function searchCoursesByName(text: string, origin: LatLon | null, signal?: AbortSignal): Promise<NearbyCourse[]> {
+  const dir = searchUsCoursesByName(text, origin, signal).catch(() => [] as NearbyCourse[]);
+  const osm = origin
+    ? runOverpass(nameQuery(text, origin), signal)
+        .then((json) => parseNearbyCourses(json, origin))
+        .catch(() => [] as NearbyCourse[])
+    : Promise.resolve([] as NearbyCourse[]);
+  const [d, o] = await Promise.all([dir, osm]);
+  return mergeCourseLists(o, d);
 }
 
 export async function fetchCourseHoles(course: Course, signal?: AbortSignal) {

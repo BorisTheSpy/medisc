@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, Map as MapIcon, MoreHorizontal, Minus, Plus,
 import { useCourse, useHoles, usePlayers, useRound, useRoundScores, useSetting } from "@/db/hooks";
 import { addPlayerToRound, adjustStrokes, createPlayer, deleteRound, finishRound, removePlayerFromRound, setHolePar, setSetting, setThrows } from "@/db/repo";
 import { useGeolocation } from "@/services/useGeolocation";
-import { formatDistance, haversineM, type Units } from "@/domain/geo";
+import { formatHoleDistance, haversineM, type Units } from "@/domain/geo";
 import { formatToPar, roundTotals, scoreLabel, isHoledOut } from "@/domain/scoring";
 import type { HoleScore, Player, Zone } from "@/domain/types";
 import { Avatar, Button, Field, IconButton, Sheet, Spinner, cx } from "@/components/ui";
@@ -13,9 +13,9 @@ import { CourseMap } from "@/map/CourseMap";
 const ZONES: { zone: Zone; label: string; hint: string }[] = [
   { zone: "fairway", label: "Fairway", hint: "In play, outside circle 2" },
   { zone: "off_fairway", label: "Off fairway", hint: "Rough, trees, still in bounds" },
-  { zone: "c2", label: "Circle 2", hint: "10–20 m from the basket" },
-  { zone: "c1", label: "Circle 1", hint: "Inside 10 m" },
-  { zone: "parked", label: "Parked", hint: "Inside 3 m, a tap-in" },
+  { zone: "c2", label: "Circle 2", hint: "33–66 ft from the basket" },
+  { zone: "c1", label: "Circle 1", hint: "Inside 33 ft" },
+  { zone: "parked", label: "Parked", hint: "Inside 10 ft, a tap-in" },
   { zone: "ob", label: "OB", hint: "Out of bounds, +1 penalty" },
 ];
 
@@ -154,14 +154,14 @@ export function ScorecardRoute() {
             {hole?.distanceM ? (
               <div>
                 <div className="text-[13px] font-medium text-brand-ink/70">Length</div>
-                <div className="display numeric text-[34px]">{formatDistance(hole.distanceM, units)}</div>
+                <div className="display numeric text-[34px]">{formatHoleDistance(hole.distanceM, units)}</div>
               </div>
             ) : null}
             <div>
               <div className="flex items-center justify-end gap-1 text-[13px] font-medium text-brand-ink/70">
                 <Crosshair size={12} /> To basket
               </div>
-              <div className={cx("display numeric text-[34px]", distanceToBasket === null && "text-brand-ink/40")}>{distanceToBasket !== null ? formatDistance(distanceToBasket, units) : "–"}</div>
+              <div className={cx("display numeric text-[34px]", distanceToBasket === null && "text-brand-ink/40")}>{distanceToBasket !== null ? formatHoleDistance(distanceToBasket, units) : "–"}</div>
             </div>
           </div>
         </div>

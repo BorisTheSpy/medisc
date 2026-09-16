@@ -29,14 +29,43 @@ export function metresToFeet(m: number): number {
   return m * 3.28084;
 }
 
+export function metresToYards(m: number): number {
+  return m * 1.09361;
+}
+
+/**
+ * General distances. Imperial: feet up to 1000 ft, yards up to half a mile, then miles.
+ */
 export function formatDistance(metres: number, units: Units): string {
   if (units === "ft") {
     const ft = metresToFeet(metres);
-    if (ft >= 2640) return `${(ft / 5280).toFixed(1)} mi`;
-    return `${Math.round(ft)} ft`;
+    if (ft < 1000) return `${Math.round(ft)} ft`;
+    if (ft < 2640) return `${Math.round(ft / 3)} yd`;
+    return `${(ft / 5280).toFixed(1)} mi`;
   }
   if (metres >= 1000) return `${(metres / 1000).toFixed(1)} km`;
   return `${Math.round(metres)} m`;
+}
+
+/** Hole lengths and distance to the basket: always feet in imperial, metres in metric. */
+export function formatHoleDistance(metres: number, units: Units): string {
+  if (units === "ft") return `${Math.round(metresToFeet(metres)).toLocaleString()} ft`;
+  return `${Math.round(metres)} m`;
+}
+
+/** Course-to-you distances: miles (or km) with one decimal, feet under a quarter mile. */
+export function formatTravelDistance(metres: number, units: Units): string {
+  if (units === "ft") {
+    const mi = metres / 1609.344;
+    if (mi < 0.25) return `${Math.round(metresToFeet(metres))} ft`;
+    return `${mi.toFixed(1)} mi`;
+  }
+  if (metres < 1000) return `${Math.round(metres)} m`;
+  return `${(metres / 1000).toFixed(1)} km`;
+}
+
+export function unitLabel(units: Units): string {
+  return units === "ft" ? "ft" : "m";
 }
 
 export interface BBox {

@@ -19,8 +19,8 @@ export default defineConfig({
         short_name: "Medisc",
         description: "Disc golf scorecards, course maps and stats",
         display: "standalone",
-        background_color: "#163a2c",
-        theme_color: "#163a2c",
+        background_color: "#1b3f7a",
+        theme_color: "#1b3f7a",
         start_url: "/",
         icons: [
           { src: "icons/icon-192.png", sizes: "192x192", type: "image/png" },

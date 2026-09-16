@@ -169,7 +169,7 @@ export function EmptyState({ icon, title, body, action }: { icon?: ReactNode; ti
 }
 
 const SCORE_CLASS: Record<ScoreLabel, string> = {
-  ace: "bg-ace text-white rounded-[4px] rotate-0",
+  ace: "bg-ace text-white rounded-[4px]",
   eagle: "bg-eagle text-white rounded-full",
   birdie: "bg-birdie text-white rounded-full",
   par: "bg-transparent text-ink",

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { Check, Plus, Search, UserPlus } from "lucide-react";
 import { useCourses, useHoles, useMe, usePlayers } from "@/db/hooks";
 import { createPlayer, createRound, getSetting } from "@/db/repo";
-import { haversineM, formatDistance, type Units } from "@/domain/geo";
+import { haversineM, formatTravelDistance, type Units } from "@/domain/geo";
 import type { Course, LatLon } from "@/domain/types";
 import { useSetting } from "@/db/hooks";
 import { Avatar, Button, Chip, Field, PageHeader, Section, Sheet, cx } from "@/components/ui";
@@ -115,7 +115,7 @@ export function NewRoundRoute() {
                 </div>
               )}
               {sortedCourses.slice(0, 12).map(({ c, d }) => (
-                <CourseOption key={c.id} course={c} distance={Number.isFinite(d) ? formatDistance(d, units) : undefined} onClick={() => setCourseId(c.id)} />
+                <CourseOption key={c.id} course={c} distance={Number.isFinite(d) ? formatTravelDistance(d, units) : undefined} onClick={() => setCourseId(c.id)} />
               ))}
             </div>
             <button className="mt-2 flex items-center gap-1 text-sm font-semibold text-birdie" onClick={() => nav("/courses")}>

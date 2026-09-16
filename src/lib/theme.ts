@@ -16,7 +16,7 @@ export function applyTheme(pref: ThemePref): void {
   if (pref === "system") root.removeAttribute("data-theme");
   else root.setAttribute("data-theme", pref);
   const dark = pref === "dark" || (pref === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#0f1f18" : "#163a2c");
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#0e1b2e" : "#1b3f7a");
   try {
     localStorage.setItem(KEY, pref);
   } catch {

@@ -72,7 +72,7 @@ function holesGeoJSON(holes: Hole[]): FeatureCollection {
 }
 
 const ACTIVE = "#E9A83A";
-const LINE = "#163A2C";
+const LINE = "#1B3F7A";
 
 function lineColor(active?: number) {
   return ["case", ["==", ["get", "number"], active ?? -1], ACTIVE, LINE] as unknown as string;

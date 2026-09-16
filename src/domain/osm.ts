@@ -67,7 +67,8 @@ export function parseNearbyCourses(json: OverpassResponse, origin?: LatLon): Nea
     if (tags.leisure !== "disc_golf_course") continue;
     const pos = elementPosition(e);
     if (!pos) continue;
-    const name = tags.name ?? tags["name:en"] ?? "Unnamed disc golf course";
+    const name = tags.name ?? tags["name:en"];
+    if (!name) continue;
     const course: NearbyCourse = {
       id: `osm-${e.type}-${e.id}`,
       source: "osm",
@@ -227,6 +228,14 @@ export function nearbyQuery(center: LatLon, radiusM: number): string {
   const lat = Number(center.lat.toFixed(5));
   const lon = Number(center.lon.toFixed(5));
   return `[out:json][timeout:25];nwr["leisure"="disc_golf_course"](around:${Math.round(radiusM)},${lat},${lon});out tags center;`;
+}
+
+/** Courses whose name matches text, within a wide radius of a point. */
+export function nameQuery(text: string, center: LatLon, radiusM = 200_000): string {
+  const escaped = text.replace(/[\\"\[\]().*+?^$|{}]/g, (ch) => "\\" + ch);
+  const lat = Number(center.lat.toFixed(5));
+  const lon = Number(center.lon.toFixed(5));
+  return `[out:json][timeout:25];nwr["leisure"="disc_golf_course"]["name"~"${escaped}",i](around:${Math.round(radiusM)},${lat},${lon});out tags center;`;
 }
 
 export function courseHolesQuery(course: Course, aroundM = 700): string {
