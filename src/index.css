@@ -1,0 +1,244 @@
+@import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+:root {
+  --bg: #f3f5f1;
+  --surface: #ffffff;
+  --surface-2: #e8ece5;
+  --surface-3: #dde3d9;
+  --ink: #14201a;
+  --ink-2: #4b5a50;
+  --ink-3: #7f8f82;
+  --line: rgba(20, 32, 26, 0.1);
+  --line-strong: rgba(20, 32, 26, 0.22);
+  --brand: #163a2c;
+  --brand-2: #1f4d3b;
+  --brand-ink: #f3f5f1;
+  --accent: #e9a83a;
+  --accent-2: #f2c063;
+  --accent-ink: #14201a;
+  --danger: #c4553b;
+  --danger-ink: #ffffff;
+  --ace: #2fa37e;
+  --eagle: #27558f;
+  --birdie: #3f75ba;
+  --birdie-soft: #dbe6f5;
+  --bogey: #f6cfae;
+  --double: #ee9a61;
+  --triple: #d5612b;
+  --map-tee: #e9a83a;
+  --map-basket: #f3f5f1;
+  --shadow: 0 1px 2px rgba(20, 32, 26, 0.06), 0 8px 24px -12px rgba(20, 32, 26, 0.18);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f1f18;
+  --surface: #17271f;
+  --surface-2: #213328;
+  --surface-3: #2b4033;
+  --ink: #eef2ea;
+  --ink-2: #b4c0b3;
+  --ink-3: #7f8f82;
+  --line: rgba(238, 242, 234, 0.1);
+  --line-strong: rgba(238, 242, 234, 0.24);
+  --brand: #1e4d3a;
+  --brand-2: #276249;
+  --brand-ink: #f3f5f1;
+  --accent: #f0b44c;
+  --accent-2: #f6c96f;
+  --accent-ink: #14201a;
+  --danger: #e0755c;
+  --danger-ink: #14201a;
+  --ace: #3dbb92;
+  --eagle: #4a7bbf;
+  --birdie: #6d9bd9;
+  --birdie-soft: #24384f;
+  --bogey: #8a5a3e;
+  --double: #b96a3b;
+  --triple: #d97a3a;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1f18;
+    --surface: #17271f;
+    --surface-2: #213328;
+    --surface-3: #2b4033;
+    --ink: #eef2ea;
+    --ink-2: #b4c0b3;
+    --ink-3: #7f8f82;
+    --line: rgba(238, 242, 234, 0.1);
+    --line-strong: rgba(238, 242, 234, 0.24);
+    --brand: #1e4d3a;
+    --brand-2: #276249;
+    --brand-ink: #f3f5f1;
+    --accent: #f0b44c;
+    --accent-2: #f6c96f;
+    --accent-ink: #14201a;
+    --danger: #e0755c;
+    --danger-ink: #14201a;
+    --ace: #3dbb92;
+    --eagle: #4a7bbf;
+    --birdie: #6d9bd9;
+    --birdie-soft: #24384f;
+    --bogey: #8a5a3e;
+    --double: #b96a3b;
+    --triple: #d97a3a;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --font-sans: "Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-brand: var(--brand);
+  --color-brand-2: var(--brand-2);
+  --color-brand-ink: var(--brand-ink);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-accent-ink: var(--accent-ink);
+  --color-danger: var(--danger);
+  --color-danger-ink: var(--danger-ink);
+  --color-ace: var(--ace);
+  --color-eagle: var(--eagle);
+  --color-birdie: var(--birdie);
+  --color-birdie-soft: var(--birdie-soft);
+  --color-bogey: var(--bogey);
+  --color-double: var(--double);
+  --color-triple: var(--triple);
+  --radius-card: 14px;
+  --radius-sheet: 22px;
+  --shadow-card: var(--shadow);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-optical-sizing: auto;
+  font-variation-settings: "wdth" 100;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+.display {
+  font-variation-settings: "wdth" 88;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+}
+
+.numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.hairline {
+  border-color: var(--line);
+}
+
+button,
+[role="button"] {
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.maplibregl-ctrl-attrib {
+  font-size: 10px;
+}
+
+.maplibregl-popup-content {
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 10px;
+  font-family: var(--font-sans);
+}
+
+.maplibregl-popup-tip {
+  border-top-color: var(--surface) !important;
+}
+
+.hole-marker {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  border: 2px solid #ffffff;
+}
+
+.hole-marker.tee {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.hole-marker.basket {
+  background: #163a2c;
+  color: #f3f5f1;
+}
+
+.hole-marker.active {
+  transform: scale(1.25);
+  border-color: var(--accent);
+}
+
+.user-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #3f75ba;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 2px rgba(63, 117, 186, 0.35), 0 1px 4px rgba(0, 0, 0, 0.4);
+}
