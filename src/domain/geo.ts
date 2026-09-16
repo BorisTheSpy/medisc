@@ -58,6 +58,7 @@ export function formatTravelDistance(metres: number, units: Units): string {
   if (units === "ft") {
     const mi = metres / 1609.344;
     if (mi < 0.25) return `${Math.round(metresToFeet(metres))} ft`;
+    if (mi >= 100) return `${Math.round(mi).toLocaleString()} mi`;
     return `${mi.toFixed(1)} mi`;
   }
   if (metres < 1000) return `${Math.round(metres)} m`;

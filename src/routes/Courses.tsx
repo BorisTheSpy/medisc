@@ -122,8 +122,17 @@ export function CoursesRoute() {
     setSearchBusy(true);
     setPlaceResults(null);
     try {
-      const results = await searchCoursesByName(text, origin, controller.signal);
-      if (!controller.signal.aborted) setSearchResults(results);
+      await searchCoursesByName(
+        text,
+        origin,
+        (results) => {
+          if (!controller.signal.aborted) {
+            setSearchResults(results);
+            setSearchBusy(false);
+          }
+        },
+        controller.signal,
+      );
     } catch {
       if (!controller.signal.aborted) setSearchResults([]);
     } finally {
@@ -204,7 +213,7 @@ export function CoursesRoute() {
         {query.trim() && (
           <div className="mt-2 flex gap-2">
             <Button size="sm" variant="brand" onClick={runCourseSearch} disabled={searchBusy} className="flex-1">
-              {searchBusy ? <Spinner className="h-4 w-4" /> : <Search size={14} />} Find course “{query.trim()}”
+              {searchBusy ? <Spinner className="h-4 w-4" /> : <Search size={14} />} Find course
             </Button>
             <Button size="sm" onClick={runPlaceSearch} disabled={placeBusy} className="flex-1">
               {placeBusy ? <Spinner className="h-4 w-4" /> : <MapPin size={14} />} Go to place

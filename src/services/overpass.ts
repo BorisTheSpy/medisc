@@ -92,16 +92,27 @@ export async function fetchNearbyCourses(center: LatLon, radiusM: number, opts: 
   return { courses: mergeCourseLists(osm ?? [], us), fromCache: osm !== null && osmError !== null, fetchedAt: Date.now() };
 }
 
-/** Search courses by name: the whole US directory plus OpenStreetMap within 125 miles of the origin. */
-export async function searchCoursesByName(text: string, origin: LatLon | null, signal?: AbortSignal): Promise<NearbyCourse[]> {
-  const dir = searchUsCoursesByName(text, origin, signal).catch(() => [] as NearbyCourse[]);
-  const osm = origin
-    ? runOverpass(nameQuery(text, origin), signal)
-        .then((json) => parseNearbyCourses(json, origin))
-        .catch(() => [] as NearbyCourse[])
-    : Promise.resolve([] as NearbyCourse[]);
-  const [d, o] = await Promise.all([dir, osm]);
-  return mergeCourseLists(o, d);
+/**
+ * Search courses by name. The US directory answers fast and is delivered first; OpenStreetMap results
+ * within 125 miles of the origin are merged in when they arrive via `onUpdate`.
+ */
+export async function searchCoursesByName(text: string, origin: LatLon | null, onUpdate: (courses: NearbyCourse[]) => void, signal?: AbortSignal): Promise<void> {
+  let directory: NearbyCourse[] = [];
+  try {
+    directory = await searchUsCoursesByName(text, origin, signal);
+  } catch {
+    directory = [];
+  }
+  if (signal?.aborted) return;
+  onUpdate(directory);
+  if (!origin) return;
+  try {
+    const json = await runOverpass(nameQuery(text, origin), signal);
+    if (signal?.aborted) return;
+    onUpdate(mergeCourseLists(parseNearbyCourses(json, origin), directory));
+  } catch {
+    /* keep directory results */
+  }
 }
 
 export async function fetchCourseHoles(course: Course, signal?: AbortSignal) {

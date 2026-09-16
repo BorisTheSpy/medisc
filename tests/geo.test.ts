@@ -30,6 +30,7 @@ describe("geo", () => {
     expect(formatHoleDistance(1_800, "ft")).toBe("5,906 ft");
     expect(formatTravelDistance(200, "ft")).toBe("656 ft");
     expect(formatTravelDistance(4_500, "ft")).toBe("2.8 mi");
+    expect(formatTravelDistance(1_670_000, "ft")).toBe("1,038 mi");
   });
 
   it("bbox grows with radius", () => {
