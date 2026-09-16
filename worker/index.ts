@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-type Env = { ASSETS: Fetcher };
+type Env = { ASSETS: Fetcher; GOOGLE_PLACES_KEY?: string };
 
 const ENDPOINTS = [
   "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
@@ -193,6 +193,101 @@ app.get("/api/courses/us", async (c) => {
     return c.json({ attribution: "Course data supplied by DiscGolfAPI.", courses: near }, 200, { "Cache-Control": "public, max-age=3600" });
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : "Course directory unavailable" }, 502);
+  }
+});
+
+// Google Places (New) as an optional third source. Enabled when GOOGLE_PLACES_KEY is set.
+// Field mask keeps calls on the Pro SKU (5,000 free per month). Results are cached 30 days per cell,
+// which is the maximum Google's terms allow for place data other than IDs.
+const PLACES_TTL_SECONDS = 30 * 86_400;
+const PLACES_FIELDS = "places.id,places.displayName,places.location,places.formattedAddress,places.types,nextPageToken";
+
+interface PlaceRow {
+  id: string;
+  displayName?: { text?: string };
+  location?: { latitude: number; longitude: number };
+  formattedAddress?: string;
+  types?: string[];
+}
+
+interface PlaceCourse {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  address?: string;
+  distanceM?: number;
+}
+
+async function placesSearch(key: string, textQuery: string, center: { lat: number; lon: number } | null, radius: number, maxPages: number): Promise<PlaceCourse[]> {
+  const out: PlaceCourse[] = [];
+  let pageToken: string | undefined;
+  for (let page = 0; page < maxPages; page++) {
+    const body: Record<string, unknown> = { textQuery, maxResultCount: 20, languageCode: "en" };
+    if (center) {
+      body.locationBias = { circle: { center: { latitude: center.lat, longitude: center.lon }, radius: Math.min(radius, 50_000) } };
+      body.rankPreference = "DISTANCE";
+    }
+    if (pageToken) body.pageToken = pageToken;
+    const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": key, "X-Goog-FieldMask": PLACES_FIELDS },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) throw new Error(`Google Places responded ${res.status}`);
+    const json = (await res.json()) as { places?: PlaceRow[]; nextPageToken?: string };
+    for (const p of json.places ?? []) {
+      if (!p.location || !p.displayName?.text) continue;
+      const name = p.displayName.text;
+      // Text search can return shops and clubs; keep parks and anything that says disc golf.
+      const t = p.types ?? [];
+      const looksLikeCourse = /disc\s*golf|frisbee|dgc/i.test(name) || t.includes("park") || t.includes("golf_course") || t.includes("sports_complex");
+      if (!looksLikeCourse) continue;
+      out.push({ id: p.id, name, lat: p.location.latitude, lon: p.location.longitude, address: p.formattedAddress });
+    }
+    pageToken = json.nextPageToken;
+    if (!pageToken) break;
+  }
+  return out;
+}
+
+app.get("/api/courses/places", async (c) => {
+  const key = c.env.GOOGLE_PLACES_KEY;
+  if (!key) return c.json({ enabled: false, courses: [] });
+  const lat = Number(c.req.query("lat"));
+  const lon = Number(c.req.query("lon"));
+  const radius = Math.min(Number(c.req.query("radius") ?? 40_000), 80_000);
+  const q = (c.req.query("q") ?? "").trim().slice(0, 80);
+  const hasOrigin = Number.isFinite(lat) && Number.isFinite(lon);
+  if (!hasOrigin && !q) return c.json({ error: "lat and lon, or q, are required" }, 400);
+
+  // Cache by a coarse cell so nearby users share results and the free tier goes a long way.
+  const cell = hasOrigin ? `${(Math.round(lat * 20) / 20).toFixed(2)},${(Math.round(lon * 20) / 20).toFixed(2)}` : "none";
+  const cacheKey = new Request(`https://medisc.cache/places/${encodeURIComponent(q.toLowerCase())}/${cell}/${Math.round(radius / 5000)}`);
+  const cache = caches.default;
+  const hit = await cache.match(cacheKey).catch(() => undefined);
+  if (hit) {
+    const res = new Response(hit.body, hit);
+    res.headers.set("X-Places-Source", "cache");
+    return res;
+  }
+  try {
+    const center = hasOrigin ? { lat, lon } : null;
+    const textQuery = q ? `${q} disc golf` : "disc golf course";
+    let list = await placesSearch(key, textQuery, center, radius, q ? 1 : 3);
+    if (center) {
+      list = list.map((x) => ({ ...x, distanceM: haversineM(lat, lon, x.lat, x.lon) }));
+      if (!q) list = list.filter((x) => (x.distanceM ?? 0) <= radius);
+      list.sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0));
+    }
+    const res = new Response(JSON.stringify({ enabled: true, courses: list }), {
+      headers: { "Content-Type": "application/json", "Cache-Control": `public, max-age=${PLACES_TTL_SECONDS}` },
+    });
+    c.executionCtx.waitUntil(cache.put(cacheKey, res.clone()).catch(() => {}));
+    return res;
+  } catch (err) {
+    return c.json({ enabled: true, error: err instanceof Error ? err.message : "Places unavailable", courses: [] }, 502);
   }
 });
 

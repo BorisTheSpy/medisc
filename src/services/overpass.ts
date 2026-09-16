@@ -2,6 +2,7 @@ import { db } from "@/db/db";
 import type { Course, LatLon } from "@/domain/types";
 import { nearbyQuery, nameQuery, courseHolesQuery, parseNearbyCourses, parseCourseHoles, mergeCourseLists, type OverpassResponse, type NearbyCourse } from "@/domain/osm";
 import { fetchUsCourses, searchUsCoursesByName } from "./discgolfapi";
+import { fetchPlacesCourses, searchPlacesByName } from "./places";
 
 const DIRECT_ENDPOINTS = [
   "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
@@ -77,23 +78,34 @@ export async function fetchNearbyCourses(
   const cached = await db.overpassCache.get(key);
   const cachedFresh = !!cached && !opts.force && Date.now() - cached.fetchedAt < NEARBY_TTL;
 
-  // The US directory answers in well under a second; deliver it as soon as it lands.
+  // The US directory and Google Places answer quickly; deliver each as soon as it lands.
   let us: NearbyCourse[] = [];
+  let places: NearbyCourse[] = [];
+  const emit = () => {
+    if (opts.signal?.aborted) return;
+    const osmNow = cachedFresh ? parseNearbyCourses(cached!.json as OverpassResponse, center) : [];
+    const fast = mergeCourseLists(us, places);
+    if (fast.length > 0) opts.onUpdate?.(mergeCourseLists(osmNow, fast));
+  };
   const usPromise = fetchUsCourses(center, radiusM, opts.signal)
     .catch(() => [] as NearbyCourse[])
     .then((list) => {
       us = list;
-      if (!opts.signal?.aborted && list.length > 0) {
-        const osmNow = cachedFresh ? parseNearbyCourses(cached!.json as OverpassResponse, center) : [];
-        opts.onUpdate?.(mergeCourseLists(osmNow, list));
-      }
+      emit();
+      return list;
+    });
+  const placesPromise = fetchPlacesCourses(center, radiusM, opts.signal)
+    .catch(() => [] as NearbyCourse[])
+    .then((list) => {
+      places = list;
+      emit();
       return list;
     });
 
   if (cachedFresh) {
     const osm = parseNearbyCourses(cached!.json as OverpassResponse, center);
-    await usPromise;
-    return { courses: mergeCourseLists(osm, us), fromCache: true, fetchedAt: cached!.fetchedAt };
+    await Promise.all([usPromise, placesPromise]);
+    return { courses: mergeCourseLists(osm, mergeCourseLists(us, places)), fromCache: true, fetchedAt: cached!.fetchedAt };
   }
 
   let osm: NearbyCourse[] | null = null;
@@ -106,9 +118,10 @@ export async function fetchNearbyCourses(
     osmError = err;
     if (cached) osm = parseNearbyCourses(cached.json as OverpassResponse, center);
   }
-  await usPromise;
-  if (osm === null && us.length === 0) throw osmError instanceof Error ? osmError : new OverpassError("Course search is unavailable right now");
-  return { courses: mergeCourseLists(osm ?? [], us), fromCache: osm !== null && osmError !== null, fetchedAt: Date.now() };
+  await Promise.all([usPromise, placesPromise]);
+  const fast = mergeCourseLists(us, places);
+  if (osm === null && fast.length === 0) throw osmError instanceof Error ? osmError : new OverpassError("Course search is unavailable right now");
+  return { courses: mergeCourseLists(osm ?? [], fast), fromCache: osm !== null && osmError !== null, fetchedAt: Date.now() };
 }
 
 /**
@@ -116,13 +129,12 @@ export async function fetchNearbyCourses(
  * within 125 miles of the origin are merged in when they arrive via `onUpdate`.
  */
 export async function searchCoursesByName(text: string, origin: LatLon | null, onUpdate: (courses: NearbyCourse[]) => void, signal?: AbortSignal): Promise<void> {
-  let directory: NearbyCourse[] = [];
-  try {
-    directory = await searchUsCoursesByName(text, origin, signal);
-  } catch {
-    directory = [];
-  }
+  const [dir, gp] = await Promise.all([
+    searchUsCoursesByName(text, origin, signal).catch(() => [] as NearbyCourse[]),
+    searchPlacesByName(text, origin, signal).catch(() => [] as NearbyCourse[]),
+  ]);
   if (signal?.aborted) return;
+  const directory = mergeCourseLists(dir, gp);
   onUpdate(directory);
   if (!origin) return;
   try {

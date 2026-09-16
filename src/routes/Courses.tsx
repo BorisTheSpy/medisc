@@ -40,6 +40,7 @@ export function CoursesRoute() {
   const [placeResults, setPlaceResults] = useState<Place[] | null>(null);
   const [placeBusy, setPlaceBusy] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [placeFallback, setPlaceFallback] = useState<Place | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const searchAbort = useRef<AbortController | null>(null);
   const requested = useRef(false);
@@ -143,6 +144,7 @@ export function CoursesRoute() {
     setSearchBusy(true);
     setPlaceResults(null);
     try {
+      setPlaceFallback(null);
       await searchCoursesByName(
         text,
         origin,
@@ -150,6 +152,16 @@ export function CoursesRoute() {
           if (!controller.signal.aborted) {
             setSearchResults(results);
             setSearchBusy(false);
+            if (results.length === 0) {
+              // Nothing by that name: it may be a park the directories have not listed yet.
+              searchPlace(text, controller.signal)
+                .then((places) => {
+                  if (controller.signal.aborted) return;
+                  const best = places.find((p) => !origin || haversineM(origin, p) < 400_000) ?? null;
+                  setPlaceFallback(best);
+                })
+                .catch(() => {});
+            }
           }
         },
         controller.signal,
@@ -187,6 +199,7 @@ export function CoursesRoute() {
     setQuery("");
     setSearchResults(null);
     setPlaceResults(null);
+    setPlaceFallback(null);
     searchAbort.current?.abort();
     setSearchBusy(false);
   }
@@ -284,11 +297,17 @@ export function CoursesRoute() {
           {searchResults.length === 0 ? (
             <EmptyState
               title="No course by that name"
-              body="Try a shorter name or the park it is in. If it is brand new, add it yourself."
+              body={placeFallback ? `The directories do not list a course here yet, but the place exists: ${placeFallback.label.split(",").slice(0, 3).join(", ")}. Add it and set the holes yourself.` : "Try a shorter name or the park it is in. If it is brand new, add it yourself."}
               action={
-                <Button variant="brand" onClick={() => nav("/courses/new")}>
-                  <Plus size={18} /> Add a course
-                </Button>
+                placeFallback ? (
+                  <Button variant="primary" onClick={() => nav(`/courses/new?name=${encodeURIComponent(query.trim())}&lat=${placeFallback.lat}&lon=${placeFallback.lon}&city=${encodeURIComponent(placeFallback.city ?? "")}`)}>
+                    <Plus size={18} /> Add course at {query.trim()}
+                  </Button>
+                ) : (
+                  <Button variant="brand" onClick={() => nav("/courses/new")}>
+                    <Plus size={18} /> Add a course
+                  </Button>
+                )
               }
             />
           ) : (

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import { LocateFixed, Trash2, Plus } from "lucide-react";
 import { useCourse, useHoles, useSetting } from "@/db/hooks";
 import { createCustomCourse, getSetting, saveHoles, setSetting, updateHole } from "@/db/repo";
@@ -19,28 +19,33 @@ export function CourseEditRoute() {
 function NewCourse() {
   const nav = useNavigate();
   const geo = useGeolocation(false);
-  const [name, setName] = useState("");
+  const [params] = useSearchParams();
+  const presetLat = Number(params.get("lat"));
+  const presetLon = Number(params.get("lon"));
+  const preset = Number.isFinite(presetLat) && Number.isFinite(presetLon) && params.get("lat") ? { lat: presetLat, lon: presetLon } : null;
+  const [name, setName] = useState(params.get("name") ?? "");
   const [holeCount, setHoleCount] = useState(18);
   const [defaultPar, setDefaultPar] = useState(3);
-  const [pos, setPos] = useState<LatLon | null>(null);
+  const [pos, setPos] = useState<LatLon | null>(preset);
   const [placeQ, setPlaceQ] = useState("");
   const [places, setPlaces] = useState<Place[] | null>(null);
   const [busy, setBusy] = useState(false);
   const satellite = useSetting<boolean>("satellite", false);
 
   useEffect(() => {
-    if (geo.position) setPos({ lat: geo.position.lat, lon: geo.position.lon });
+    if (geo.position && !preset) setPos({ lat: geo.position.lat, lon: geo.position.lon });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geo.position]);
 
   useEffect(() => {
-    if (!pos) getSetting<LatLon | null>("lastOrigin", null).then((o) => o && setPos(o));
+    if (!pos) getSetting<LatLon | null>("lastOrigin", null).then((o) => o && setPos((cur) => cur ?? o));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function create() {
     if (!name.trim() || !pos) return;
     setBusy(true);
-    const course = await createCustomCourse({ name, lat: pos.lat, lon: pos.lon, holeCount, defaultPar });
+    const course = await createCustomCourse({ name, lat: pos.lat, lon: pos.lon, holeCount, defaultPar, city: params.get("city") || undefined });
     nav(`/courses/${course.id}/edit`, { replace: true });
   }
 

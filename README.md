@@ -44,12 +44,23 @@ The Worker is named `medisc` in `wrangler.jsonc`. After the first deploy the app
 
 For git-based deploys, connect the repository under Workers & Pages > Create > Connect to Git. The Worker name in the dashboard must match `name` in `wrangler.jsonc`. Build command `bun run build`, deploy command `bunx wrangler deploy`.
 
+## Optional: Google Places for better coverage
+
+The two free sources miss some courses (Blair Mill Park in Stallings, NC, for example). Adding a Google Places key fills those gaps with Google Maps' listings. Text Search sits on the Pro SKU, which includes 5,000 free calls a month; the Worker caches each area for 30 days, so a personal app stays well inside that.
+
+1. In Google Cloud, enable **Places API (New)** and create an API key restricted to it.
+2. Locally: create `.dev.vars` containing `GOOGLE_PLACES_KEY=your-key`.
+3. Production: `bunx wrangler secret put GOOGLE_PLACES_KEY`.
+
+Without the key the app works exactly as before.
+
 ## Data sources and attribution
 
 - Course locations and hole geometry: OpenStreetMap contributors, ODbL, via the Overpass API.
 - US course directory: DiscGolfAPI ("Course data supplied by DiscGolfAPI.").
 - Basemap: OpenFreeMap (OpenMapTiles). Satellite imagery: Esri World Imagery and partners, for non-commercial use.
 - Place search: Nominatim.
+- Optional: Google Places (New) for course locations when a key is configured.
 
 Medisc is an independent project and is not affiliated with UDisc.
 
