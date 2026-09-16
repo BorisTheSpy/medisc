@@ -114,7 +114,7 @@ describe("throw stats", () => {
     expect(t.c1Putting.made).toBe(1);
     expect(t.c1Putting.attempts).toBe(1);
     expect(t.obRate).toBeCloseTo(1 / 3, 5);
-    expect(t.throwIns).toBe(1);
+    expect(t.throwIns).toBe(2); // holes 1 and 3 end fairway -> basket
   });
 
   it("is empty when nothing is tracked", () => {
