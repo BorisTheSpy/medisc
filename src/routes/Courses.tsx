@@ -71,6 +71,7 @@ export function CoursesRoute() {
       abortRef.current = controller;
       setLoading(true);
       setError(null);
+      if (!force) setCourses(null);
       try {
         const res = await fetchNearbyCourses(origin, radiusKm * 1000, { force, signal: controller.signal });
         setCourses(res.courses);
@@ -238,8 +239,8 @@ export function CoursesRoute() {
           )}
           {courses && merged.length === 0 && !loading && (
             <EmptyState
-              title="No courses found"
-              body={`Nothing within ${radiusKm} km on OpenStreetMap. Widen the search or add the course yourself.`}
+              title={query.trim() ? `Nothing here matches “${query.trim()}”` : "No courses found"}
+              body={query.trim() ? "Tap Search place to look somewhere else, or clear the filter." : `Nothing within ${radiusKm} km. Widen the search or add the course yourself.`}
               action={
                 <Button variant="brand" onClick={() => nav("/courses/new")}>
                   <Plus size={18} /> Add a course
