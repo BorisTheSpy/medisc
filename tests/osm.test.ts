@@ -80,6 +80,8 @@ describe("osm helpers", () => {
     expect(parseHoleCount({ "disc_golf:course": "9" })).toBe(9);
     expect(parseHoleCount({ "disc_golf:course": "18 hole" })).toBe(18);
     expect(parseHoleCount({ description: "21 väylää - 21 holes" })).toBe(21);
+    expect(parseHoleCount({ name: "Reedy Creek Disc Golf Course (Holes 1–9)" })).toBe(9);
+    expect(parseHoleCount({ name: "Sugaw Creek 9 Hole" })).toBe(9);
     expect(parseHoleCount({})).toBeUndefined();
   });
 

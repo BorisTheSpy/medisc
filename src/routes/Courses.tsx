@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { LocateFixed, Search, Plus, MapPinOff, RefreshCw, MapPin, X } from "lucide-react";
+import { LocateFixed, Search, Plus, MapPinOff, RefreshCw, MapPin, X, Play, Info } from "lucide-react";
 import { useGeolocation } from "@/services/useGeolocation";
 import { fetchNearbyCourses, searchCoursesByName } from "@/services/overpass";
 import { searchPlace, type Place } from "@/services/nominatim";
@@ -39,6 +39,7 @@ export function CoursesRoute() {
   const [searchBusy, setSearchBusy] = useState(false);
   const [placeResults, setPlaceResults] = useState<Place[] | null>(null);
   const [placeBusy, setPlaceBusy] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const searchAbort = useRef<AbortController | null>(null);
   const requested = useRef(false);
@@ -75,16 +76,23 @@ export function CoursesRoute() {
       abortRef.current = controller;
       setLoading(true);
       setError(null);
-      if (!force) setCourses(null);
+      const radiusM = radiusMi * MILE;
+      // Keep whatever is already on screen that still fits the new radius; new results are merged in.
+      const keep = (list: NearbyCourse[] | null) => (list ?? []).filter((c) => c.distanceM !== undefined && c.distanceM <= radiusM && haversineM(origin, c) <= radiusM);
+      const union = (prev: NearbyCourse[] | null, next: NearbyCourse[]) => {
+        const seen = new Set(next.map((c) => c.id));
+        return [...next, ...keep(prev).filter((c) => !seen.has(c.id))].sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0));
+      };
+      setCourses((prev) => (prev ? keep(prev) : prev));
       try {
-        const res = await fetchNearbyCourses(origin, radiusMi * MILE, {
+        const res = await fetchNearbyCourses(origin, radiusM, {
           force,
           signal: controller.signal,
           onUpdate: (partial) => {
-            if (!controller.signal.aborted) setCourses(partial);
+            if (!controller.signal.aborted) setCourses((prev) => union(prev, partial));
           },
         });
-        setCourses(res.courses);
+        setCourses((prev) => union(prev, res.courses));
         setFromCache(res.fromCache);
       } catch (err) {
         if (controller.signal.aborted) return;
@@ -118,6 +126,13 @@ export function CoursesRoute() {
     const saved = await upsertCourse({ ...course, distanceM: undefined } as NearbyCourse);
     nav(`/courses/${saved.id}`);
   }
+
+  async function play(course: NearbyCourse) {
+    const saved = await upsertCourse({ ...course, distanceM: undefined } as NearbyCourse);
+    nav(`/play?course=${saved.id}`);
+  }
+
+  const selected = useMemo(() => merged.find((c) => c.id === selectedId) ?? null, [merged, selectedId]);
 
   async function runCourseSearch() {
     const text = query.trim();
@@ -293,17 +308,48 @@ export function CoursesRoute() {
         />
       ) : view === "map" ? (
         <div className="mt-3 px-4">
-          <PinMap
-            center={origin}
-            radiusM={radiusMi * MILE}
-            user={geo.position}
-            pins={merged.map((c) => ({ id: c.id, lat: c.lat, lon: c.lon, label: c.name }))}
-            onPinClick={(id) => {
-              const c = merged.find((x) => x.id === id);
-              if (c) open(c);
-            }}
-            className="h-[60dvh] rounded-card shadow-card"
-          />
+          <div className="relative">
+            <PinMap
+              center={origin}
+              radiusM={radiusMi * MILE}
+              user={geo.position}
+              pins={merged.map((c) => ({ id: c.id, lat: c.lat, lon: c.lon, label: c.name, active: c.id === selectedId }))}
+              onPinClick={(id) => setSelectedId((cur) => (cur === id ? null : id))}
+              className="h-[62dvh] rounded-card shadow-card"
+            />
+            {selected && (
+              <div className="absolute inset-x-2 bottom-8 rounded-card bg-surface p-3 shadow-card" role="dialog" aria-label={selected.name}>
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-bold">{selected.name}</div>
+                    <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-ink-3">
+                      <span>{selected.holeCount} holes</span>
+                      {selected.par && <span>par {selected.par}</span>}
+                      {(selected.city || selected.region) && <span>{[selected.city, selected.region].filter(Boolean).join(", ")}</span>}
+                      {selected.distanceM !== undefined && <span>{formatTravelDistance(selected.distanceM, units)} away</span>}
+                      {selected.fee === "yes" && <span>pay to play</span>}
+                    </div>
+                  </div>
+                  <IconButton label="Close" onClick={() => setSelectedId(null)} className="-mr-2 -mt-2 h-8 w-8">
+                    <X size={16} />
+                  </IconButton>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <Button size="sm" onClick={() => open(selected)} className="flex-1">
+                    <Info size={14} /> Details
+                  </Button>
+                  <Button size="sm" variant="primary" onClick={() => play(selected)} className="flex-1">
+                    <Play size={14} fill="currentColor" /> Play here
+                  </Button>
+                </div>
+              </div>
+            )}
+            {loading && (
+              <div className="absolute left-2 top-2 flex items-center gap-2 rounded-full bg-surface px-3 py-1.5 text-xs font-medium shadow-card">
+                <Spinner className="h-3.5 w-3.5" /> Updating
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <div className="mt-3 px-4">

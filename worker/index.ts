@@ -118,13 +118,29 @@ function haversineM(lat1: number, lon1: number, lat2: number, lon2: number): num
   return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
+let memory: { at: number; list: DgaCourse[] } | null = null;
+
 async function loadUsCourses(ctx: { waitUntil(p: Promise<unknown>): void }): Promise<DgaCourse[]> {
+  if (memory && Date.now() - memory.at < DGA_TTL_SECONDS * 1000) return memory.list;
   const cache = caches.default;
   const key = new Request("https://medisc.cache/dga/us");
-  const hit = await cache.match(key);
-  if (hit) return (await hit.json()) as DgaCourse[];
-  const res = await fetch(DGA_URL, { headers: { Accept: "application/json", "User-Agent": "medisc/0.1" } });
-  if (!res.ok) throw new Error(`DiscGolfAPI responded ${res.status}`);
+  const hit = await cache.match(key).catch(() => undefined);
+  if (hit) {
+    const list = (await hit.json()) as DgaCourse[];
+    memory = { at: Date.now(), list };
+    return list;
+  }
+  let res: Response;
+  try {
+    res = await fetch(DGA_URL, { headers: { Accept: "application/json", "User-Agent": "medisc/0.1" }, signal: AbortSignal.timeout(20_000) });
+  } catch (err) {
+    if (memory) return memory.list; // stale is better than nothing
+    throw err;
+  }
+  if (!res.ok) {
+    if (memory) return memory.list;
+    throw new Error(`DiscGolfAPI responded ${res.status}`);
+  }
   const json = (await res.json()) as { courses: DgaCourse[] };
   const slim = json.courses
     .filter((c) => typeof c.lat === "number" && typeof c.lon === "number" && c.existence_status !== "closed" && c.existence_status !== "removed")
@@ -141,7 +157,8 @@ async function loadUsCourses(ctx: { waitUntil(p: Promise<unknown>): void }): Pro
       access_model: c.access_model ?? null,
       primary_layout: c.primary_layout ? { par_total: c.primary_layout.par_total ?? null, length_meters: c.primary_layout.length_meters ?? null } : null,
     }));
-  ctx.waitUntil(cache.put(key, new Response(JSON.stringify(slim), { headers: { "Content-Type": "application/json", "Cache-Control": `public, max-age=${DGA_TTL_SECONDS}` } })));
+  memory = { at: Date.now(), list: slim };
+  ctx.waitUntil(cache.put(key, new Response(JSON.stringify(slim), { headers: { "Content-Type": "application/json", "Cache-Control": `public, max-age=${DGA_TTL_SECONDS}` } })).catch(() => {}));
   return slim;
 }
 
@@ -171,7 +188,7 @@ app.get("/api/courses/us", async (c) => {
       near = near
         .filter((x) => x.distanceM <= radius)
         .sort((a, b) => a.distanceM - b.distanceM)
-        .slice(0, 200);
+        .slice(0, 500);
     }
     return c.json({ attribution: "Course data supplied by DiscGolfAPI.", courses: near }, 200, { "Cache-Control": "public, max-age=3600" });
   } catch (err) {

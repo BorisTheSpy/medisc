@@ -33,6 +33,12 @@ export function parseHoleCount(tags: Record<string, string>): number | undefined
     const m = desc.match(/(\d+)\s*(?:holes?|väylää|hål|baskets?|korit?)/i);
     if (m) return Number(m[1]);
   }
+  if (tags.name) {
+    const range = tags.name.match(/holes?\s*(\d+)\s*[-–]\s*(\d+)/i);
+    if (range) return Number(range[2]) - Number(range[1]) + 1;
+    const count = tags.name.match(/(\d+)\s*-?\s*holes?/i);
+    if (count) return Number(count[1]);
+  }
   return undefined;
 }
 

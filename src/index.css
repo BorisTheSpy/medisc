@@ -241,6 +241,16 @@ textarea {
   place-items: center;
 }
 
+.course-pin.active {
+  background: #e9a83a;
+  transform: rotate(-45deg) scale(1.25);
+  z-index: 2;
+}
+
+.course-pin.active::after {
+  background: #1b3f7a;
+}
+
 .course-pin::after {
   content: "";
   width: 10px;

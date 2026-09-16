@@ -307,6 +307,7 @@ export function PinMap({ center, pins, user, onPinClick, className, radiusM }: P
   const userRef = useRef<Marker | null>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
+  const lastFitRef = useRef<string>("");
   const onPinClickRef = useRef(onPinClick);
   onPinClickRef.current = onPinClick;
 
@@ -347,7 +348,7 @@ export function PinMap({ center, pins, user, onPinClick, className, radiusM }: P
     const b = new LngLatBounds();
     for (const p of pins) {
       const el = document.createElement("button");
-      el.className = "course-pin";
+      el.className = cx("course-pin", p.active && "active");
       el.setAttribute("aria-label", p.label);
       el.title = p.label;
       el.addEventListener("click", () => onPinClickRef.current?.(p.id));
@@ -355,6 +356,9 @@ export function PinMap({ center, pins, user, onPinClick, className, radiusM }: P
       b.extend([p.lon, p.lat]);
     }
     if (user) b.extend([user.lon, user.lat]);
+    const idKey = pins.map((p) => p.id).join("|");
+    if (lastFitRef.current === idKey) return;
+    lastFitRef.current = idKey;
     if (pins.length > 0) map.fitBounds(b, { padding: 50, maxZoom: 14, duration: 500 });
     else if (radiusM) map.easeTo({ center: [center.lon, center.lat], zoom: radiusM > 30000 ? 9 : radiusM > 15000 ? 10 : 11 });
   }, [pins, ready, user, center.lat, center.lon, radiusM]);
