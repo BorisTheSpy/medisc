@@ -18,29 +18,31 @@ React 19, Vite 8, TypeScript, Tailwind 4, react-router, Dexie (IndexedDB), MapLi
 
 ## Develop
 
+Uses [Bun](https://bun.sh) for package management and scripts.
+
 ```bash
-npm install
-npm run dev        # http://localhost:5173 with the Worker running locally
-npm test           # vitest: scoring, stats, OSM parsing, geo
-npm run typecheck
+bun install
+bun run dev        # http://localhost:5173 with the Worker running locally
+bun run test       # vitest: scoring, stats, OSM parsing, geo
+bun run typecheck
 ```
 
 Geolocation needs a secure context. `localhost` works. To test on a phone, expose the dev server over HTTPS:
 
 ```bash
-npx cloudflared tunnel --url http://localhost:5173
+bunx cloudflared tunnel --url http://localhost:5173
 ```
 
 ## Deploy to Cloudflare
 
 ```bash
-npx wrangler login
-npm run deploy     # vite build + wrangler deploy
+bunx wrangler login
+bun run deploy     # vite build + wrangler deploy
 ```
 
 The Worker is named `medisc` in `wrangler.jsonc`. After the first deploy the app is live at `https://medisc.<your-subdomain>.workers.dev`. Add a custom domain from the Worker's settings if you like.
 
-For git-based deploys, connect the repository under Workers & Pages > Create > Connect to Git. The Worker name in the dashboard must match `name` in `wrangler.jsonc`. Build command `npm run build`, deploy command `npx wrangler deploy`.
+For git-based deploys, connect the repository under Workers & Pages > Create > Connect to Git. The Worker name in the dashboard must match `name` in `wrangler.jsonc`. Build command `bun run build`, deploy command `bunx wrangler deploy`.
 
 ## Data sources and attribution
 
