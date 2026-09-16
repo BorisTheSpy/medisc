@@ -1,0 +1,313 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.4 2390de5a",
+  "osm3s": {
+    "timestamp_osm_base": "2026-09-16T18:59:21Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+
+{
+  "type": "node",
+  "id": 285853805,
+  "lat": 60.1996806,
+  "lon": 24.8701152,
+  "tags": {
+    "fee": "no",
+    "leisure": "disc_golf_course",
+    "name": "Munkkiniemen frisbeegolfrata",
+    "sport": "disc_golf"
+  }
+},
+{
+  "type": "node",
+  "id": 485292438,
+  "lat": 60.1905116,
+  "lon": 24.8975004,
+  "tags": {
+    "leisure": "disc_golf_course",
+    "name": "Meilahden frisbeegolfrata",
+    "name:fi": "Meilahden frisbeegolfrata",
+    "name:sv": "Mejlans frisbeegolfbanor",
+    "sport": "disc_golf",
+    "start_date": "1983"
+  }
+},
+{
+  "type": "node",
+  "id": 5723898021,
+  "lat": 60.2133622,
+  "lon": 24.8466086,
+  "tags": {
+    "addr:postcode": "00360",
+    "addr:street": "Takkatie",
+    "leisure": "disc_golf_course",
+    "name": "Talin frisbeegolfpuisto (Talinhuippu)",
+    "opening_hours": "24/7",
+    "sport": "disc_golf",
+    "website": "https://frisbeegolfradat.fi/rata/talin_frisbeegolfpuisto_helsinki/"
+  }
+},
+{
+  "type": "node",
+  "id": 7117658425,
+  "lat": 60.2411450,
+  "lon": 24.7958246,
+  "tags": {
+    "leisure": "disc_golf_course",
+    "name": "Äijänpelto frisbeegolf",
+    "operator": "Puskasoturit",
+    "sport": "disc_golf"
+  }
+},
+{
+  "type": "node",
+  "id": 9527001473,
+  "lat": 60.1481229,
+  "lon": 25.0453076,
+  "tags": {
+    "access": "permit",
+    "description": "21 väylää - 21 holes",
+    "leisure": "disc_golf_course",
+    "name": "Santahaminan frisbeegolfrata",
+    "operator": "VMTK",
+    "sport": "disc_golf"
+  }
+},
+{
+  "type": "node",
+  "id": 10172284466,
+  "lat": 60.1765957,
+  "lon": 24.6977981,
+  "tags": {
+    "access": "yes",
+    "fee": "no",
+    "leisure": "disc_golf_course",
+    "name": "Puolarmaari frisbeegolf",
+    "sport": "disc_golf"
+  }
+},
+{
+  "type": "node",
+  "id": 11818299263,
+  "lat": 60.2165411,
+  "lon": 24.7186400,
+  "tags": {
+    "addr:city": "Kauniainen",
+    "addr:housenumber": "11",
+    "addr:postcode": "02700",
+    "addr:street": "Oppilaskodintie",
+    "leisure": "disc_golf_course",
+    "name": "Grani DiscGolfPark",
+    "sport": "disc_golf",
+    "website": "https://frisbeegolfradat.fi/rata/grani-discgolfpark/"
+  }
+},
+{
+  "type": "node",
+  "id": 12120462314,
+  "lat": 60.2724740,
+  "lon": 24.9810485,
+  "tags": {
+    "leisure": "disc_golf_course",
+    "name": "Siltamäen frisbeegolfrata",
+    "sport": "disc_golf"
+  }
+},
+{
+  "type": "node",
+  "id": 12132324185,
+  "lat": 60.1406079,
+  "lon": 24.7602008,
+  "tags": {
+    "leisure": "disc_golf_course",
+    "name": "Iso Vasikkasaari frisbeegolf",
+    "sport": "disc_golf"
+  }
+},
+{
+  "type": "node",
+  "id": 12259136803,
+  "lat": 60.2739989,
+  "lon": 24.8218343,
+  "tags": {
+    "access": "yes",
+    "fee": "no",
+    "leisure": "disc_golf_course",
+    "name": "Varistonniitty frisbeegolfrata",
+    "name:en": "Varistonniitty Disc Golf",
+    "sport": "disc_golf"
+  }
+},
+{
+  "type": "node",
+  "id": 12719161594,
+  "lat": 60.2544854,
+  "lon": 25.0410406,
+  "tags": {
+    "access": "yes",
+    "fee": "no",
+    "leisure": "disc_golf_course",
+    "name": "Malminkentän frisbeegolfrata",
+    "name:fi": "Malminkentän frisbeegolfrata",
+    "name:sv": "Malms flygpatsens frisbeegolfbana",
+    "opening_hours": "24/7",
+    "operator": "Helsingin kaupunki",
+    "sport": "disc_golf"
+  }
+},
+{
+  "type": "node",
+  "id": 13290008835,
+  "lat": 60.2369827,
+  "lon": 25.0583660,
+  "tags": {
+    "access": "yes",
+    "addr:city": "Helsinki",
+    "addr:housenumber": "8",
+    "addr:postcode": "00940",
+    "addr:street": "Savikiekontie",
+    "fee": "no",
+    "leisure": "disc_golf_course",
+    "name": "Kivikon frisbeegolfrata",
+    "opening_hours": "24/7",
+    "operator": "Helsingin kaupunki",
+    "website": "https://frisbeegolfradat.fi/rata/kivikon_frisbeegolfrata"
+  }
+},
+{
+  "type": "node",
+  "id": 13331586786,
+  "lat": 60.2539895,
+  "lon": 24.9142392,
+  "tags": {
+    "access": "yes",
+    "fee": "no",
+    "leisure": "disc_golf_course",
+    "name": "Paloheinän frisbeegolfrata",
+    "name:fi": "Paloheinän frisbeegolfrata",
+    "name:sv": "Svedängen frisbeegolfbana",
+    "opening_hours": "24/7",
+    "operator": "Helsingin kaupunki",
+    "sport": "disc_golf"
+  }
+},
+{
+  "type": "way",
+  "id": 40254405,
+  "center": {
+    "lat": 60.2138200,
+    "lon": 24.8444457
+  },
+  "tags": {
+    "access": "yes",
+    "leisure": "disc_golf_course",
+    "name": "Talin frisbeegolfpuisto",
+    "sport": "disc_golf"
+  }
+},
+{
+  "type": "way",
+  "id": 1298761372,
+  "center": {
+    "lat": 60.2145529,
+    "lon": 25.1518604
+  },
+  "tags": {
+    "access": "yes",
+    "fee": "no",
+    "leisure": "disc_golf_course",
+    "name": "Vuosaaren frisbeegolfrata",
+    "opening_hours": "24/7",
+    "operator": "Helsingin kaupunki",
+    "sport": "disc_golf"
+  }
+},
+{
+  "type": "way",
+  "id": 1414496012,
+  "center": {
+    "lat": 60.2460691,
+    "lon": 25.0189900
+  },
+  "tags": {
+    "access": "yes",
+    "leisure": "disc_golf_course",
+    "name": "Longinojanpuiston harjoituspaikka",
+    "operator": "Helsingin kaupunki. Harjoituspaikan kunnossapidosta vastaa kulttuuri- ja vapaa-ajan toimialan liikuntapalvelukokonaisuus.",
+    "sport": "disc_golf"
+  }
+},
+{
+  "type": "relation",
+  "id": 2504377,
+  "center": {
+    "lat": 60.2389846,
+    "lon": 25.0574003
+  },
+  "tags": {
+    "access": "yes",
+    "fee": "no",
+    "leisure": "disc_golf_course",
+    "name": "Kivikon frisbeegolfrata",
+    "name:fi": "Kivikon frisbeegolfrata",
+    "name:sv": "Stensböle frisbeegolfbana",
+    "opening_hours": "24/7",
+    "operator": "Helsingin kaupunki",
+    "sport": "disc_golf",
+    "type": "multipolygon"
+  }
+},
+{
+  "type": "relation",
+  "id": 17798881,
+  "center": {
+    "lat": 60.2145529,
+    "lon": 25.1518604
+  },
+  "tags": {
+    "leisure": "disc_golf_course",
+    "name": "Vuosaaren frisbeegolfrata",
+    "type": "disc_golf_course"
+  }
+},
+{
+  "type": "relation",
+  "id": 19340787,
+  "center": {
+    "lat": 60.2548746,
+    "lon": 24.9114022
+  },
+  "tags": {
+    "disc_golf:course": "18",
+    "disc_golf:par": "54",
+    "fee": "no",
+    "leisure": "disc_golf_course",
+    "name": "Paloheinän frisbeegolfrata",
+    "opening_hours": "24/7",
+    "operator": "Helsingin kaupunki",
+    "type": "disc_golf_course"
+  }
+},
+{
+  "type": "relation",
+  "id": 19882946,
+  "center": {
+    "lat": 60.2539531,
+    "lon": 25.0394318
+  },
+  "tags": {
+    "disc_golf:course": "9",
+    "disc_golf:par": "28",
+    "leisure": "disc_golf_course",
+    "name": "Malminkentän frisbeegolfrata",
+    "name:fi": "Malminkentän frisbeegolfrata",
+    "name:sv": "Malms flygpatsens frisbeegolfbana",
+    "opening_hours": "24/7",
+    "operator": "Helsingin kaupunki",
+    "type": "disc_golf_course"
+  }
+}
+
+  ]
+}
