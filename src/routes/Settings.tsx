@@ -6,6 +6,7 @@ import { clearCaches, exportAll, importAll, setSetting, updatePlayer } from "@/d
 import { applyTheme, getThemePref, type ThemePref } from "@/lib/theme";
 import type { Units } from "@/domain/geo";
 import { Button, Field, PageHeader, Section, Segmented, Toast } from "@/components/ui";
+import { LocateFixed } from "lucide-react";
 
 export function SettingsRoute() {
   const nav = useNavigate();
@@ -15,6 +16,27 @@ export function SettingsRoute() {
   const [theme, setTheme] = useState<ThemePref>(getThemePref());
   const [name, setName] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const [geoTest, setGeoTest] = useState<string>("");
+
+  async function testLocation() {
+    const lines: string[] = [];
+    lines.push(`Secure context: ${window.isSecureContext ? "yes" : "NO"}`);
+    lines.push(`Geolocation API: ${"geolocation" in navigator ? "yes" : "NO"}`);
+    lines.push(`Standalone app: ${(navigator as Navigator & { standalone?: boolean }).standalone ? "yes" : "no"}`);
+    try {
+      const p = await navigator.permissions.query({ name: "geolocation" });
+      lines.push(`Permission: ${p.state}`);
+    } catch {
+      lines.push("Permission: unknown");
+    }
+    setGeoTest([...lines, "Asking for a fix…"].join("\n"));
+    const started = Date.now();
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setGeoTest([...lines, `Fix OK in ${Date.now() - started} ms: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)} (±${Math.round(pos.coords.accuracy)} m)`].join("\n")),
+      (err) => setGeoTest([...lines, `Fix FAILED after ${Date.now() - started} ms: code ${err.code} ${err.message}`].join("\n")),
+      { enableHighAccuracy: false, maximumAge: 0, timeout: 20_000 },
+    );
+  }
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -126,7 +148,15 @@ export function SettingsRoute() {
         <p className="mt-3 text-xs text-ink-3">Rounds, players and courses live only in this browser. Download a backup before switching phones or clearing site data.</p>
       </Section>
 
+      <Section title="Location check" className="mt-6">
+        <Button full onClick={testLocation}>
+          <LocateFixed size={18} /> Test location
+        </Button>
+        {geoTest && <pre className="mt-2 whitespace-pre-wrap rounded-card bg-surface-2 p-3 text-xs text-ink-2">{geoTest}</pre>}
+      </Section>
+
       <Section title="About" className="mt-6 mb-6">
+        <p className="mb-2 text-xs text-ink-3">Build {__BUILD__}</p>
         <p className="text-xs text-ink-3">
           Course data © OpenStreetMap contributors (ODbL). Course data supplied by DiscGolfAPI. Course locations may be powered by Google. Basemap by OpenFreeMap. Satellite imagery © Esri and partners. Medisc is an independent project and is not affiliated with UDisc.
         </p>

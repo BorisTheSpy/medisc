@@ -5,6 +5,17 @@ import tailwindcss from "@tailwindcss/vite";
 import { cloudflare } from "@cloudflare/vite-plugin";
 import { VitePWA } from "vite-plugin-pwa";
 import path from "node:path";
+import { execSync } from "node:child_process";
+
+function buildStamp(): string {
+  let sha = "dev";
+  try {
+    sha = execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+  } catch {
+    /* no git */
+  }
+  return `${new Date().toISOString().slice(0, 16).replace("T", " ")} ${sha}`;
+}
 
 export default defineConfig({
   plugins: [
@@ -52,6 +63,7 @@ export default defineConfig({
       },
     }),
   ],
+  define: { __BUILD__: JSON.stringify(buildStamp()) },
   resolve: { alias: { "@": path.resolve(import.meta.dirname, "./src") } },
   // Pre-bundle everything up front so Vite never re-optimizes mid-session, which can load two copies of React.
   optimizeDeps: {
