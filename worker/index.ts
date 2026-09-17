@@ -240,16 +240,25 @@ async function placesSearch(key: string, textQuery: string, center: { lat: numbe
     for (const p of json.places ?? []) {
       if (!p.location || !p.displayName?.text) continue;
       const name = p.displayName.text;
-      // Text search can return shops and clubs; keep parks and anything that says disc golf.
+      // Text search can return shops and clubs; keep parks and anything that says disc golf, drop retail.
       const t = p.types ?? [];
+      const isShop = /shop|store|retail|supply|supplies/i.test(name) || t.some((x) => /store|shop/.test(x));
       const looksLikeCourse = /disc\s*golf|frisbee|dgc/i.test(name) || t.includes("park") || t.includes("golf_course") || t.includes("sports_complex");
-      if (!looksLikeCourse) continue;
+      if (isShop || !looksLikeCourse) continue;
       out.push({ id: p.id, name, lat: p.location.latitude, lon: p.location.longitude, address: p.formattedAddress });
     }
     pageToken = json.nextPageToken;
     if (!pageToken) break;
   }
-  return out;
+  // Google lists a course and the park it sits in as two places a few hundred metres apart.
+  // Keep the one that names disc golf; otherwise keep the first.
+  const named = (x: PlaceCourse) => /disc\s*golf|frisbee|dgc/i.test(x.name);
+  const kept: PlaceCourse[] = [];
+  for (const x of out.sort((a, b) => Number(named(b)) - Number(named(a)))) {
+    if (kept.some((k) => haversineM(k.lat, k.lon, x.lat, x.lon) < 600)) continue;
+    kept.push(x);
+  }
+  return kept;
 }
 
 app.get("/api/courses/places", async (c) => {
@@ -264,7 +273,7 @@ app.get("/api/courses/places", async (c) => {
 
   // Cache by a coarse cell so nearby users share results and the free tier goes a long way.
   const cell = hasOrigin ? `${(Math.round(lat * 20) / 20).toFixed(2)},${(Math.round(lon * 20) / 20).toFixed(2)}` : "none";
-  const cacheKey = new Request(`https://medisc.cache/places/${encodeURIComponent(q.toLowerCase())}/${cell}/${Math.round(radius / 5000)}`);
+  const cacheKey = new Request(`https://medisc.cache/places/v2/${encodeURIComponent(q.toLowerCase())}/${cell}/${Math.round(radius / 5000)}`);
   const cache = caches.default;
   const hit = await cache.match(cacheKey).catch(() => undefined);
   if (hit) {
