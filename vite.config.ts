@@ -53,6 +53,10 @@ export default defineConfig({
     }),
   ],
   resolve: { alias: { "@": path.resolve(import.meta.dirname, "./src") } },
+  // Pre-bundle everything up front so Vite never re-optimizes mid-session, which can load two copies of React.
+  optimizeDeps: {
+    include: ["react", "react-dom", "react-dom/client", "react-router", "dexie", "dexie-react-hooks", "maplibre-gl", "recharts", "lucide-react", "date-fns"],
+  },
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],

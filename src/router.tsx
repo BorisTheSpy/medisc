@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ComponentType } from "react";
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, isRouteErrorResponse, useRouteError } from "react-router";
 import { AppShell } from "./components/AppShell";
 import { HomeRoute } from "./routes/Home";
 import { RoundsRoute } from "./routes/Rounds";
@@ -32,10 +32,31 @@ const NewRoundRoute = lazyRoute(() => import("./routes/NewRound"), "NewRoundRout
 const ScorecardRoute = lazyRoute(() => import("./routes/Scorecard"), "ScorecardRoute");
 const StatsRoute = lazyRoute(() => import("./routes/Stats"), "StatsRoute");
 
+function RouteError() {
+  const error = useRouteError();
+  const message = isRouteErrorResponse(error) ? `${error.status} ${error.statusText}` : error instanceof Error ? error.message : "Something went wrong";
+  return (
+    <div className="mx-auto flex min-h-dvh max-w-[480px] flex-col items-center justify-center px-6 text-center">
+      <h1 className="text-xl font-bold">Something broke</h1>
+      <p className="mt-2 text-sm text-ink-2">{message}</p>
+      <div className="mt-5 flex gap-2">
+        <button className="h-11 rounded-full bg-accent px-5 font-semibold text-accent-ink" onClick={() => window.location.reload()}>
+          Reload
+        </button>
+        <button className="h-11 rounded-full bg-surface-2 px-5 font-semibold" onClick={() => (window.location.href = "/")}>
+          Home
+        </button>
+      </div>
+      <p className="mt-4 text-xs text-ink-3">Your rounds are safe. This only affects the current screen.</p>
+    </div>
+  );
+}
+
 export const router = createBrowserRouter([
   {
     path: "/",
     Component: AppShell,
+    ErrorBoundary: RouteError,
     children: [
       { index: true, Component: HomeRoute },
       { path: "courses", Component: CoursesRoute },
