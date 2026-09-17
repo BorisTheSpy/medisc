@@ -4,7 +4,7 @@ import { LocateFixed, Search, Plus, MapPinOff, RefreshCw, MapPin, X, Play, Info 
 import { useGeolocation } from "@/services/useGeolocation";
 import { fetchNearbyCourses, searchCoursesByName } from "@/services/overpass";
 import { searchPlace, type Place } from "@/services/nominatim";
-import type { NearbyCourse } from "@/domain/osm";
+import { mergeCourseLists, type NearbyCourse } from "@/domain/osm";
 import type { LatLon } from "@/domain/types";
 import { formatTravelDistance, haversineM, type Units } from "@/domain/geo";
 import { upsertCourse, getSetting, setSetting } from "@/db/repo";
@@ -80,10 +80,8 @@ export function CoursesRoute() {
       const radiusM = radiusMi * MILE;
       // Keep whatever is already on screen that still fits the new radius; new results are merged in.
       const keep = (list: NearbyCourse[] | null) => (list ?? []).filter((c) => c.distanceM !== undefined && c.distanceM <= radiusM && haversineM(origin, c) <= radiusM);
-      const union = (prev: NearbyCourse[] | null, next: NearbyCourse[]) => {
-        const seen = new Set(next.map((c) => c.id));
-        return [...next, ...keep(prev).filter((c) => !seen.has(c.id))].sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0));
-      };
+      // New results win; anything previously shown that is not the same course (by id, or by name and proximity) is kept.
+      const union = (prev: NearbyCourse[] | null, next: NearbyCourse[]) => mergeCourseLists(next, keep(prev));
       setCourses((prev) => (prev ? keep(prev) : prev));
       try {
         const res = await fetchNearbyCourses(origin, radiusM, {
