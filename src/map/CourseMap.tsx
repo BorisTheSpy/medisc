@@ -4,6 +4,7 @@ import type { FeatureCollection } from "geojson";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { Crosshair, Layers } from "lucide-react";
 import type { Hole, LatLon } from "@/domain/types";
+import { haversineM } from "@/domain/geo";
 import { cx } from "@/components/ui";
 
 setWorkerUrl(workerUrl);
@@ -291,36 +292,59 @@ export function CourseMap({ center, holes = [], activeHole, user, satellite = fa
 }
 
 export interface PinMapProps {
+  /** Requested view. Applied whenever `viewKey` changes (locate, place search). */
   center: LatLon;
+  radiusM: number;
+  viewKey: number;
   pins: { id: string; lat: number; lon: number; label: string; active?: boolean }[];
   user?: UserPosition | null;
   onPinClick?: (id: string) => void;
+  /** Fired after the user pans or zooms, with the circle that covers the viewport. */
+  onAreaChange?: (center: LatLon, radiusM: number) => void;
   className?: string;
-  radiusM?: number;
+  children?: ReactNode;
 }
 
-/** Overview map with course pins. */
-export function PinMap({ center, pins, user, onPinClick, className, radiusM }: PinMapProps) {
+function zoomForRadius(radiusM: number, lat: number, widthPx: number): number {
+  // metres per pixel at zoom z: 156543.03 * cos(lat) / 2^z ; we want the radius to span half the width
+  const mpp = (radiusM * 2) / Math.max(widthPx, 200);
+  return Math.log2((156543.03 * Math.cos((lat * Math.PI) / 180)) / mpp);
+}
+
+/** Overview map with course pins. The visible area is the search area. */
+export function PinMap({ center, radiusM, viewKey, pins, user, onPinClick, onAreaChange, className, children }: PinMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
   const userRef = useRef<Marker | null>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
-  const lastFitRef = useRef<string>("");
   const onPinClickRef = useRef(onPinClick);
   onPinClickRef.current = onPinClick;
+  const onAreaChangeRef = useRef(onAreaChange);
+  onAreaChangeRef.current = onAreaChange;
+  const appliedViewKey = useRef(-1);
 
   useEffect(() => {
     if (!containerRef.current) return;
     let map: MLMap;
     try {
-      map = new MLMap({ container: containerRef.current, style: BASEMAP_STYLE, center: [center.lon, center.lat], zoom: 11, attributionControl: { compact: true }, dragRotate: false, pitchWithRotate: false });
+      map = new MLMap({
+        container: containerRef.current,
+        style: BASEMAP_STYLE,
+        center: [center.lon, center.lat],
+        zoom: zoomForRadius(radiusM, center.lat, containerRef.current.clientWidth),
+        attributionControl: { compact: true },
+        dragRotate: false,
+        pitchWithRotate: false,
+      });
     } catch {
       setFailed(true);
       return;
     }
     mapRef.current = map;
+    (containerRef.current as HTMLDivElement & { __map?: MLMap }).__map = map;
+    map.touchZoomRotate.disableRotation();
     let styleFailed = false;
     let styleLoaded = false;
     map.on("error", (e) => {
@@ -333,6 +357,15 @@ export function PinMap({ center, pins, user, onPinClick, className, radiusM }: P
       styleLoaded = true;
       setReady(true);
     });
+    map.on("moveend", (e) => {
+      // Only user gestures count; programmatic moves (locate, place search) already know their area.
+      if (!(e as { originalEvent?: unknown }).originalEvent) return;
+      const c = map.getCenter();
+      const ne = map.getBounds().getNorthEast();
+      const r = haversineM({ lat: c.lat, lon: c.lng }, { lat: ne.lat, lon: ne.lng });
+      onAreaChangeRef.current?.({ lat: c.lat, lon: c.lng }, r);
+    });
+    appliedViewKey.current = viewKey;
     return () => {
       map.remove();
       mapRef.current = null;
@@ -340,28 +373,31 @@ export function PinMap({ center, pins, user, onPinClick, className, radiusM }: P
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Apply an externally requested view.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || appliedViewKey.current === viewKey) return;
+    appliedViewKey.current = viewKey;
+    map.easeTo({ center: [center.lon, center.lat], zoom: zoomForRadius(radiusM, center.lat, map.getContainer().clientWidth), duration: 600 });
+  }, [viewKey, center.lat, center.lon, radiusM, ready]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
     for (const m of markersRef.current) m.remove();
     markersRef.current = [];
-    const b = new LngLatBounds();
     for (const p of pins) {
       const el = document.createElement("button");
       el.className = cx("course-pin", p.active && "active");
       el.setAttribute("aria-label", p.label);
       el.title = p.label;
-      el.addEventListener("click", () => onPinClickRef.current?.(p.id));
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        onPinClickRef.current?.(p.id);
+      });
       markersRef.current.push(new Marker({ element: el, anchor: "bottom", offset: [0, 4] }).setLngLat([p.lon, p.lat]).addTo(map));
-      b.extend([p.lon, p.lat]);
     }
-    if (user) b.extend([user.lon, user.lat]);
-    const idKey = pins.map((p) => p.id).join("|");
-    if (lastFitRef.current === idKey) return;
-    lastFitRef.current = idKey;
-    if (pins.length > 0) map.fitBounds(b, { padding: 50, maxZoom: 14, duration: 500 });
-    else if (radiusM) map.easeTo({ center: [center.lon, center.lat], zoom: radiusM > 30000 ? 9 : radiusM > 15000 ? 10 : 11 });
-  }, [pins, ready, user, center.lat, center.lon, radiusM]);
+  }, [pins, ready]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -377,6 +413,7 @@ export function PinMap({ center, pins, user, onPinClick, className, radiusM }: P
   return (
     <div className={cx("relative overflow-hidden bg-surface-2", className)}>
       <div ref={containerRef} className="absolute inset-0" />
+      {children}
     </div>
   );
 }

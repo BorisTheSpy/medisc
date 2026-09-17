@@ -38,7 +38,7 @@ function NewCourse() {
   }, [geo.position]);
 
   useEffect(() => {
-    if (!pos) getSetting<LatLon | null>("lastOrigin", null).then((o) => o && setPos((cur) => cur ?? o));
+    if (!pos) getSetting<LatLon | null>("lastArea", null).then((o) => o && setPos((cur) => cur ?? { lat: o.lat, lon: o.lon }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

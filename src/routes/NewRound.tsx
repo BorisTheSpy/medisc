@@ -33,7 +33,7 @@ export function NewRoundRoute() {
   }, [me, selected.length]);
 
   useEffect(() => {
-    getSetting<LatLon | null>("lastOrigin", null).then(setOrigin);
+    getSetting<LatLon | null>("lastArea", null).then((a) => a && setOrigin({ lat: a.lat, lon: a.lon }));
     getSetting<boolean>("trackThrows", false).then(setTrackThrows);
   }, []);
 

@@ -9,31 +9,31 @@ import type { LatLon } from "@/domain/types";
 import { formatTravelDistance, haversineM, type Units } from "@/domain/geo";
 import { upsertCourse, getSetting, setSetting } from "@/db/repo";
 import { useCourses, useSetting } from "@/db/hooks";
-import { Button, Chip, EmptyState, Field, IconButton, PageHeader, Segmented, Spinner } from "@/components/ui";
+import { Button, EmptyState, Field, IconButton, PageHeader, Segmented, Spinner, cx } from "@/components/ui";
 import { PinMap } from "@/map/CourseMap";
 
-const RADII = [
-  { mi: 10, label: "10 mi" },
-  { mi: 25, label: "25 mi" },
-  { mi: 50, label: "50 mi" },
-  { mi: 100, label: "100 mi" },
-];
 const MILE = 1609.344;
+const DEFAULT_RADIUS_M = 10 * MILE;
+const MAX_RADIUS_M = 100 * MILE;
 
-type Origin = LatLon & { label?: string; fromDevice?: boolean };
+/** The circle currently being searched: the map viewport, or a radius around you / a searched place. */
+interface Area extends LatLon {
+  radiusM: number;
+  label?: string;
+  fromDevice?: boolean;
+}
 
 export function CoursesRoute() {
   const nav = useNavigate();
   const geo = useGeolocation(false);
   const units = useSetting<Units>("units", "ft");
   const savedCourses = useCourses();
-  const [radiusMi, setRadiusMi] = useState(25);
   const [view, setView] = useState<"list" | "map">("list");
-  const [origin, setOrigin] = useState<Origin | null>(null);
+  const [area, setArea] = useState<Area | null>(null);
+  const [viewKey, setViewKey] = useState(0); // bump to move the map to `area`
   const [courses, setCourses] = useState<NearbyCourse[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fromCache, setFromCache] = useState(false);
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<NearbyCourse[] | null>(null);
   const [searchBusy, setSearchBusy] = useState(false);
@@ -44,13 +44,13 @@ export function CoursesRoute() {
   const abortRef = useRef<AbortController | null>(null);
   const searchAbort = useRef<AbortController | null>(null);
   const requested = useRef(false);
+  const moveTimer = useRef<number | null>(null);
 
-  // Restore the last origin so the list is instant on return, then ask the device for a fresh fix.
+  // Restore the last area so the list is instant on return, then ask the device for a fresh fix.
   useEffect(() => {
-    getSetting<Origin | null>("lastOrigin", null).then((o) => {
-      if (o) setOrigin((cur) => cur ?? o);
+    getSetting<Area | null>("lastArea", null).then((a) => {
+      if (a) setArea((cur) => cur ?? { ...a, radiusM: Math.min(a.radiusM || DEFAULT_RADIUS_M, MAX_RADIUS_M) });
     });
-    getSetting<number>("radiusMi", 25).then(setRadiusMi);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -61,65 +61,90 @@ export function CoursesRoute() {
     }
   }, [geo.supported, geo.permission, geo]);
 
+  /** Move the search area to the device position (first fix, or when the user taps locate). */
+  const goToDevice = useCallback((pos: LatLon, force: boolean) => {
+    setArea((cur) => {
+      if (!force && cur?.fromDevice && haversineM(cur, pos) < 200) return cur;
+      const next: Area = { lat: pos.lat, lon: pos.lon, radiusM: DEFAULT_RADIUS_M, fromDevice: true };
+      setSetting("lastArea", next);
+      return next;
+    });
+    setViewKey((k) => k + 1);
+  }, []);
+
+  const firstFix = useRef(true);
   useEffect(() => {
-    if (geo.position) {
-      const o: Origin = { lat: geo.position.lat, lon: geo.position.lon, fromDevice: true };
-      setOrigin((cur) => (cur && cur.fromDevice && haversineM(cur, o) < 200 ? cur : o));
-      setSetting("lastOrigin", o);
+    if (!geo.position) return;
+    // Only auto-move on the first fix; later fixes just update the dot so a panned map is not yanked back.
+    if (firstFix.current) {
+      firstFix.current = false;
+      goToDevice(geo.position, false);
     }
-  }, [geo.position]);
+  }, [geo.position, goToDevice]);
 
-  const load = useCallback(
-    async (force = false) => {
-      if (!origin) return;
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-      setLoading(true);
-      setError(null);
-      const radiusM = radiusMi * MILE;
-      // Keep whatever is already on screen that still fits the new radius; new results are merged in.
-      const keep = (list: NearbyCourse[] | null) => (list ?? []).filter((c) => c.distanceM !== undefined && c.distanceM <= radiusM && haversineM(origin, c) <= radiusM);
-      // New results win; anything previously shown that is not the same course (by id, or by name and proximity) is kept.
-      const union = (prev: NearbyCourse[] | null, next: NearbyCourse[]) => mergeCourseLists(next, keep(prev));
-      setCourses((prev) => (prev ? keep(prev) : prev));
-      try {
-        const res = await fetchNearbyCourses(origin, radiusM, {
-          force,
-          signal: controller.signal,
-          onUpdate: (partial) => {
-            if (!controller.signal.aborted) setCourses((prev) => union(prev, partial));
-          },
-        });
-        setCourses((prev) => union(prev, res.courses));
-        setFromCache(res.fromCache);
-      } catch (err) {
-        if (controller.signal.aborted) return;
-        setError(err instanceof Error ? err.message : "Could not load courses");
-        setCourses((c) => c ?? []);
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    },
-    [origin, radiusMi],
-  );
+  const load = useCallback(async (target: Area, force = false) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setLoading(true);
+    setError(null);
+    const keep = (list: NearbyCourse[] | null) => (list ?? []).filter((c) => haversineM(target, c) <= target.radiusM);
+    const union = (prev: NearbyCourse[] | null, next: NearbyCourse[]) => mergeCourseLists(next, keep(prev));
+    setCourses((prev) => (prev ? keep(prev) : prev));
+    try {
+      const res = await fetchNearbyCourses(target, target.radiusM, {
+        force,
+        signal: controller.signal,
+        onUpdate: (partial) => {
+          if (!controller.signal.aborted) setCourses((prev) => union(prev, partial));
+        },
+      });
+      if (controller.signal.aborted) return;
+      setCourses((prev) => union(prev, res.courses));
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      setError(err instanceof Error ? err.message : "Could not load courses");
+      setCourses((c) => c ?? []);
+    } finally {
+      if (!controller.signal.aborted) setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    load();
+    if (area) load(area);
     return () => abortRef.current?.abort();
-  }, [load]);
+  }, [area, load]);
+
+  /** The map was panned or zoomed by the user: the viewport becomes the search area (debounced). */
+  function onAreaChange(center: LatLon, radiusM: number) {
+    if (moveTimer.current) window.clearTimeout(moveTimer.current);
+    moveTimer.current = window.setTimeout(() => {
+      const next: Area = { lat: center.lat, lon: center.lon, radiusM: Math.min(radiusM, MAX_RADIUS_M) };
+      setArea(next);
+      setSetting("lastArea", next);
+    }, 500);
+  }
+
+  // Distance shown to the user is from their own position when known, otherwise from the area centre.
+  const me: LatLon | null = geo.position ?? (area?.fromDevice ? area : null);
+  const withDistance = useCallback(
+    (list: NearbyCourse[]) => {
+      const from = me ?? area;
+      return list.map((c) => ({ ...c, distanceM: from ? haversineM(from, c) : c.distanceM }));
+    },
+    [me, area],
+  );
 
   const merged = useMemo(() => {
     const list: NearbyCourse[] = [...(courses ?? [])];
     for (const c of savedCourses) {
-      if (c.source !== "custom") continue;
-      const d = origin ? haversineM(origin, c) : undefined;
-      if (d === undefined || d <= radiusMi * MILE) list.push({ ...c, distanceM: d });
+      if (c.source !== "custom" || !area) continue;
+      if (haversineM(area, c) <= area.radiusM && !list.some((x) => x.id === c.id)) list.push({ ...c });
     }
     const q = query.trim().toLowerCase();
     const filtered = q ? list.filter((c) => c.name.toLowerCase().includes(q) || c.city?.toLowerCase().includes(q)) : list;
-    return filtered.sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0));
-  }, [courses, savedCourses, origin, radiusMi, query]);
+    return withDistance(filtered).sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0));
+  }, [courses, savedCourses, area, query, withDistance]);
 
   async function open(course: NearbyCourse) {
     const saved = await upsertCourse({ ...course, distanceM: undefined } as NearbyCourse);
@@ -141,25 +166,23 @@ export function CoursesRoute() {
     searchAbort.current = controller;
     setSearchBusy(true);
     setPlaceResults(null);
+    setPlaceFallback(null);
     try {
-      setPlaceFallback(null);
       await searchCoursesByName(
         text,
-        origin,
+        me ?? area,
         (results) => {
-          if (!controller.signal.aborted) {
-            setSearchResults(results);
-            setSearchBusy(false);
-            if (results.length === 0) {
-              // Nothing by that name: it may be a park the directories have not listed yet.
-              searchPlace(text, controller.signal)
-                .then((places) => {
-                  if (controller.signal.aborted) return;
-                  const best = places.find((p) => !origin || haversineM(origin, p) < 400_000) ?? null;
-                  setPlaceFallback(best);
-                })
-                .catch(() => {});
-            }
+          if (controller.signal.aborted) return;
+          setSearchResults(withDistance(results));
+          setSearchBusy(false);
+          if (results.length === 0) {
+            searchPlace(text, controller.signal)
+              .then((places) => {
+                if (controller.signal.aborted) return;
+                const origin = me ?? area;
+                setPlaceFallback(places.find((p) => !origin || haversineM(origin, p) < 400_000) ?? null);
+              })
+              .catch(() => {});
           }
         },
         controller.signal,
@@ -186,9 +209,10 @@ export function CoursesRoute() {
   }
 
   function choosePlace(p: Place) {
-    const o: Origin = { lat: p.lat, lon: p.lon, label: p.label.split(",")[0] };
-    setOrigin(o);
-    setSetting("lastOrigin", o);
+    const next: Area = { lat: p.lat, lon: p.lon, radiusM: DEFAULT_RADIUS_M, label: p.label.split(",")[0] };
+    setArea(next);
+    setSetting("lastArea", next);
+    setViewKey((k) => k + 1);
     setPlaceResults(null);
     setQuery("");
   }
@@ -202,24 +226,26 @@ export function CoursesRoute() {
     setSearchBusy(false);
   }
 
-  function changeRadius(mi: number) {
-    setRadiusMi(mi);
-    setSetting("radiusMi", mi);
+  function recenter() {
+    if (geo.position) goToDevice(geo.position, true);
+    else geo.locate();
   }
 
   const showingSearch = searchResults !== null;
+  const areaLabel = !area ? (geo.loading ? "Finding your location…" : "Location needed") : area.label ? `Near ${area.label}` : area.fromDevice ? "Near you" : "In the map area";
+  const tooWide = !!area && area.radiusM >= MAX_RADIUS_M;
 
   return (
     <div>
       <PageHeader
         title="Courses"
-        sub={origin ? (origin.label ? `Near ${origin.label}` : origin.fromDevice ? "Near you" : "Near your last location") : geo.loading ? "Finding your location…" : "Location needed"}
+        sub={areaLabel}
         right={
           <>
-            <IconButton label="Refresh" onClick={() => load(true)} disabled={!origin || loading}>
+            <IconButton label="Refresh" onClick={() => area && load(area, true)} disabled={!area || loading}>
               <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
             </IconButton>
-            <IconButton label="Use my location" onClick={geo.locate} disabled={geo.loading}>
+            <IconButton label="Go to my location" onClick={recenter} disabled={geo.loading}>
               <LocateFixed size={22} className={geo.loading ? "animate-pulse" : ""} />
             </IconButton>
           </>
@@ -263,13 +289,8 @@ export function CoursesRoute() {
           </div>
         )}
         {!showingSearch && (
-          <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
-            {RADII.map((r) => (
-              <Chip key={r.mi} active={radiusMi === r.mi} onClick={() => changeRadius(r.mi)}>
-                {r.label}
-              </Chip>
-            ))}
-            <div className="flex-1" />
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <span className="text-xs text-ink-3">{area ? `${merged.length} ${merged.length === 1 ? "course" : "courses"} ${view === "map" ? "in view" : "in this area"}` : ""}</span>
             <Segmented
               value={view}
               onChange={setView}
@@ -289,7 +310,7 @@ export function CoursesRoute() {
               {searchResults.length} {searchResults.length === 1 ? "match" : "matches"} across the US
             </h2>
             <button className="text-sm font-semibold text-birdie" onClick={clearSearch}>
-              Back to nearby
+              Back to map area
             </button>
           </div>
           {searchResults.length === 0 ? (
@@ -312,7 +333,7 @@ export function CoursesRoute() {
             <CourseList courses={searchResults} units={units} onOpen={open} />
           )}
         </div>
-      ) : !origin ? (
+      ) : !area ? (
         <EmptyState
           icon={<MapPinOff size={36} />}
           title={geo.loading ? "Finding your location" : "Where are you playing?"}
@@ -325,15 +346,30 @@ export function CoursesRoute() {
         />
       ) : view === "map" ? (
         <div className="mt-3 px-4">
-          <div className="relative">
-            <PinMap
-              center={origin}
-              radiusM={radiusMi * MILE}
-              user={geo.position}
-              pins={merged.map((c) => ({ id: c.id, lat: c.lat, lon: c.lon, label: c.name, active: c.id === selectedId }))}
-              onPinClick={(id) => setSelectedId((cur) => (cur === id ? null : id))}
-              className="h-[62dvh] rounded-card shadow-card"
-            />
+          <PinMap
+            center={area}
+            radiusM={area.radiusM}
+            viewKey={viewKey}
+            user={geo.position}
+            pins={merged.map((c) => ({ id: c.id, lat: c.lat, lon: c.lon, label: c.name, active: c.id === selectedId }))}
+            onPinClick={(id) => setSelectedId((cur) => (cur === id ? null : id))}
+            onAreaChange={onAreaChange}
+            className="h-[66dvh] rounded-card shadow-card"
+          >
+            <button aria-label="Go to my location" onClick={recenter} className="absolute right-2 top-2 grid h-10 w-10 place-items-center rounded-full bg-surface text-ink shadow-card">
+              <LocateFixed size={18} />
+            </button>
+            {(loading || tooWide) && (
+              <div className="absolute left-2 top-2 flex items-center gap-2 rounded-full bg-surface px-3 py-1.5 text-xs font-medium shadow-card">
+                {tooWide ? (
+                  "Zoom in to see all courses"
+                ) : (
+                  <>
+                    <Spinner className="h-3.5 w-3.5" /> Updating
+                  </>
+                )}
+              </div>
+            )}
             {selected && (
               <div className="absolute inset-x-2 bottom-8 rounded-card bg-surface p-3 shadow-card" role="dialog" aria-label={selected.name}>
                 <div className="flex items-start gap-2">
@@ -361,21 +397,17 @@ export function CoursesRoute() {
                 </div>
               </div>
             )}
-            {loading && (
-              <div className="absolute left-2 top-2 flex items-center gap-2 rounded-full bg-surface px-3 py-1.5 text-xs font-medium shadow-card">
-                <Spinner className="h-3.5 w-3.5" /> Updating
-              </div>
-            )}
-          </div>
+          </PinMap>
+          <p className="mt-2 text-center text-[11px] text-ink-3">Drag or zoom the map to search that area. Course data © OpenStreetMap contributors. Course data supplied by DiscGolfAPI.</p>
         </div>
       ) : (
         <div className="mt-3 px-4">
-          {geo.error && !origin.fromDevice && <div className="mb-3 rounded-card bg-surface-2 px-4 py-3 text-sm text-ink-2">{geo.error}</div>}
+          {geo.error && !area.fromDevice && <div className="mb-3 rounded-card bg-surface-2 px-4 py-3 text-sm text-ink-2">{geo.error}</div>}
           {error && (
             <div className="mb-3 rounded-card bg-danger/10 px-4 py-3 text-sm text-ink">
               {courses && courses.length > 0 ? "Some sources did not answer. " : ""}
               {error}
-              <button className="ml-2 font-semibold text-birdie" onClick={() => load(true)}>
+              <button className="ml-2 font-semibold text-birdie" onClick={() => load(area, true)}>
                 Retry
               </button>
             </div>
@@ -388,36 +420,32 @@ export function CoursesRoute() {
           {loading && !courses && (
             <div className="grid place-items-center py-10">
               <Spinner />
-              <div className="mt-3 text-sm text-ink-3">Looking for courses within {radiusMi} miles…</div>
+              <div className="mt-3 text-sm text-ink-3">Looking for courses…</div>
             </div>
           )}
           {courses && merged.length === 0 && !loading && (
             <EmptyState
-              title={query.trim() ? `Nothing nearby matches “${query.trim()}”` : "No courses found"}
-              body={query.trim() ? "Tap Find course to search the whole country, or clear the filter." : `Nothing within ${radiusMi} miles. Widen the search or add the course yourself.`}
+              title={query.trim() ? `Nothing here matches “${query.trim()}”` : "No courses in this area"}
+              body={query.trim() ? "Tap Find course to search the whole country, or clear the filter." : "Open the map and drag to another area, or add the course yourself."}
               action={
                 query.trim() ? (
                   <Button variant="brand" onClick={runCourseSearch}>
                     <Search size={18} /> Find course
                   </Button>
                 ) : (
-                  <Button variant="brand" onClick={() => nav("/courses/new")}>
-                    <Plus size={18} /> Add a course
+                  <Button variant="brand" onClick={() => setView("map")}>
+                    <MapPin size={18} /> Open the map
                   </Button>
                 )
               }
             />
           )}
           {merged.length > 0 && <CourseList courses={merged} units={units} onOpen={open} />}
-          {courses && (
-            <p className="mt-3 text-center text-[11px] text-ink-3">
-              {fromCache ? "From your last search. " : ""}Course data © OpenStreetMap contributors. Course data supplied by DiscGolfAPI.
-            </p>
-          )}
+          {courses && <p className="mt-3 text-center text-[11px] text-ink-3">Course data © OpenStreetMap contributors. Course data supplied by DiscGolfAPI.</p>}
         </div>
       )}
 
-      <div className="pointer-events-none fixed inset-x-0 bottom-20 z-20 flex justify-center px-4" style={{ marginBottom: "env(safe-area-inset-bottom)" }}>
+      <div className={cx("pointer-events-none fixed inset-x-0 bottom-20 z-20 flex justify-center px-4", view === "map" && !showingSearch && "hidden")} style={{ marginBottom: "env(safe-area-inset-bottom)" }}>
         <div className="flex w-full max-w-[448px] justify-end">
           <button onClick={() => nav("/courses/new")} className="pointer-events-auto flex h-14 items-center gap-2 rounded-full bg-accent px-5 font-bold text-accent-ink shadow-card">
             <Plus size={20} /> Add course
