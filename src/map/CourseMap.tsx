@@ -223,7 +223,10 @@ export function CourseMap({ center, holes = [], activeHole, user, satellite = fa
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    if (fitOn === "none") return;
+    if (fitOn === "none") {
+      map.easeTo({ center: [center.lon, center.lat], zoom: zoom ?? map.getZoom(), duration: 400 });
+      return;
+    }
     const pts: LatLon[] = [];
     if (fitOn === "active" && activeHole !== undefined) {
       const h = holes.find((x) => x.number === activeHole);
