@@ -121,12 +121,26 @@ function EditHoles({ courseId }: { courseId: string }) {
   const satellite = useSetting<boolean>("satellite", false);
   const geo = useGeolocation(false);
   const [selected, setSelected] = useState<number>(1);
-  const [placing, setPlacing] = useState<"tee" | "basket">("tee");
+  const [placing, setPlacing] = useState<"tee" | "basket" | "course">("tee");
+  const [mapCenter, setMapCenter] = useState<LatLon | null>(null);
+  const [placeQ, setPlaceQ] = useState("");
+  const [places, setPlaces] = useState<Place[] | null>(null);
+  const needsLocation = !!course?.tags?.__needsLocation;
+  useEffect(() => {
+    if (needsLocation) setPlacing("course");
+  }, [needsLocation]);
   const [name, setName] = useState<string | null>(null);
 
   const hole = useMemo(() => holes.find((h) => h.number === selected), [holes, selected]);
 
   async function onMapClick(p: LatLon) {
+    if (placing === "course") {
+      const tags = { ...(course?.tags ?? {}) };
+      delete tags.__needsLocation;
+      await db.courses.update(courseId, { lat: p.lat, lon: p.lon, tags, updatedAt: Date.now() });
+      setPlacing("tee");
+      return;
+    }
     if (!hole) return;
     const next: Hole = { ...hole, [placing]: p };
     if (next.tee && next.basket) {
@@ -199,13 +213,52 @@ function EditHoles({ courseId }: { courseId: string }) {
             </>
           )}
         </div>
-        <p className="mb-2 text-sm text-ink-2">
-          Hole <strong>{selected}</strong>: tap the map to set the <strong>{placing}</strong>.
-          <button className="ml-2 font-semibold text-birdie" onClick={() => setPlacing(placing === "tee" ? "basket" : "tee")}>
-            Switch to {placing === "tee" ? "basket" : "tee"}
-          </button>
-        </p>
-        <CourseMap center={course} holes={holes} activeHole={selected} user={geo.position} satellite={satellite} onSatelliteChange={(v) => setSetting("satellite", v)} onMapClick={onMapClick} onHoleClick={setSelected} fitOn={hole?.tee ? "active" : "holes"} className="h-[42dvh] rounded-card shadow-card" />
+        {placing === "course" ? (
+          <div className="mb-2">
+            <p className="text-sm text-ink-2">Tap the map where this course is. Search a place to jump there first.</p>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!placeQ.trim()) return;
+                setPlaces(await searchPlace(placeQ).catch(() => []));
+              }}
+              className="mt-2 flex gap-2"
+            >
+              <Field name="cplace" value={placeQ} onChange={(e) => setPlaceQ(e.target.value)} placeholder="Park name or address" className="h-10 flex-1" />
+              <Button type="submit" className="h-10">
+                Search
+              </Button>
+            </form>
+            {places && (
+              <div className="mt-2 overflow-hidden rounded-card bg-surface shadow-card">
+                {places.length === 0 && <div className="px-4 py-3 text-sm text-ink-2">No places matched.</div>}
+                {places.map((p) => (
+                  <button
+                    key={`${p.lat},${p.lon}`}
+                    onClick={() => {
+                      setMapCenter({ lat: p.lat, lon: p.lon });
+                      setPlaces(null);
+                    }}
+                    className="block w-full border-b hairline px-4 py-3 text-left text-sm last:border-b-0"
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="mb-2 text-sm text-ink-2">
+            Hole <strong>{selected}</strong>: tap the map to set the <strong>{placing}</strong>.
+            <button className="ml-2 font-semibold text-birdie" onClick={() => setPlacing(placing === "tee" ? "basket" : "tee")}>
+              Switch to {placing === "tee" ? "basket" : "tee"}
+            </button>
+            <button className="ml-2 font-semibold text-birdie" onClick={() => setPlacing("course")}>
+              Move course pin
+            </button>
+          </p>
+        )}
+        <CourseMap center={mapCenter ?? course} holes={holes} activeHole={selected} user={geo.position} satellite={satellite} onSatelliteChange={(v) => setSetting("satellite", v)} onMapClick={onMapClick} onHoleClick={setSelected} fitOn={placing === "course" ? "none" : hole?.tee ? "active" : "holes"} zoom={placing === "course" ? 15 : undefined} className="h-[42dvh] rounded-card shadow-card" />
         {!geo.position && (
           <button className="mt-2 flex items-center gap-1 text-sm font-semibold text-birdie" onClick={geo.locate}>
             <LocateFixed size={14} /> Show my position on the map

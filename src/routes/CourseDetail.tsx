@@ -131,6 +131,14 @@ export function CourseDetailRoute() {
           )}
         </div>
 
+        {course.tags?.__needsLocation && (
+          <div className="mt-3 rounded-card bg-surface-2 px-4 py-3 text-sm text-ink-2">
+            This course came from your UDisc import and has no map location yet.
+            <button className="ml-2 font-semibold text-birdie" onClick={() => nav(`/courses/${course.id}/edit`)}>
+              Set location
+            </button>
+          </div>
+        )}
         {fetchError && (
           <div className="mt-3 rounded-card bg-surface-2 px-4 py-3 text-sm text-ink-2">
             {fetchError}

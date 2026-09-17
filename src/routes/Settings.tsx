@@ -6,7 +6,10 @@ import { clearCaches, exportAll, importAll, setSetting, updatePlayer } from "@/d
 import { applyTheme, getThemePref, type ThemePref } from "@/lib/theme";
 import type { Units } from "@/domain/geo";
 import { Button, Field, PageHeader, Section, Segmented, Toast } from "@/components/ui";
-import { LocateFixed } from "lucide-react";
+import { LocateFixed, FileDown } from "lucide-react";
+import { importUdiscCsv } from "@/db/importUdisc";
+import { getSetting } from "@/db/repo";
+import type { LatLon } from "@/domain/types";
 
 export function SettingsRoute() {
   const nav = useNavigate();
@@ -38,6 +41,25 @@ export function SettingsRoute() {
     );
   }
   const fileRef = useRef<HTMLInputElement>(null);
+  const udiscRef = useRef<HTMLInputElement>(null);
+  const [udiscStatus, setUdiscStatus] = useState<string>("");
+
+  async function importUdisc(file: File) {
+    setUdiscStatus("Reading file…");
+    try {
+      const origin = await getSetting<LatLon | null>("lastArea", null);
+      const s = await importUdiscCsv(await file.text(), origin ? { lat: origin.lat, lon: origin.lon } : null, setUdiscStatus);
+      const parts = [`${s.rounds} rounds imported`];
+      if (s.skipped) parts.push(`${s.skipped} already here`);
+      if (s.courses) parts.push(`${s.courses} courses added`);
+      if (s.players) parts.push(`${s.players} players added`);
+      let msg = parts.join(", ") + ".";
+      if (s.coursesNeedingLocation.length) msg += ` Set the map location for: ${s.coursesNeedingLocation.join(", ")} (open the course and tap Edit holes).`;
+      setUdiscStatus(msg);
+    } catch (err) {
+      setUdiscStatus(err instanceof Error ? err.message : "Import failed");
+    }
+  }
 
   useEffect(() => {
     if (me) setName(me.name);
@@ -123,6 +145,15 @@ export function SettingsRoute() {
             />
           </Row>
         </div>
+      </Section>
+
+      <Section title="Import from UDisc" className="mt-6">
+        <p className="mb-2 text-xs text-ink-3">In UDisc go to You, then Rounds, open the menu and choose Export CSV. Import that file here to bring in your rounds, your cardmates, and the par for every layout you have played.</p>
+        <Button full variant="brand" onClick={() => udiscRef.current?.click()}>
+          <FileDown size={18} /> Import UDisc CSV
+        </Button>
+        <input ref={udiscRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => e.target.files?.[0] && importUdisc(e.target.files[0])} />
+        {udiscStatus && <p className="mt-2 rounded-card bg-surface-2 p-3 text-xs text-ink-2">{udiscStatus}</p>}
       </Section>
 
       <Section title="Your data" className="mt-6">
