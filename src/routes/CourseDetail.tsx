@@ -209,7 +209,7 @@ export function CourseDetailRoute() {
               </a>
             )}
             {course.source === "dga" && <span>Course data supplied by DiscGolfAPI.</span>}
-            {course.source === "places" && <span>Location from Google.</span>}
+            {course.source === "places" && <span>Powered by Google.</span>}
           </div>
         </Section>
       )}

@@ -330,7 +330,10 @@ export function CoursesRoute() {
               }
             />
           ) : (
-            <CourseList courses={searchResults} units={units} onOpen={open} />
+            <>
+              <CourseList courses={searchResults} units={units} onOpen={open} />
+              {searchResults.some((c) => c.source === "places") && <p className="mt-3 text-center text-[11px] text-ink-3">Powered by Google.</p>}
+            </>
           )}
         </div>
       ) : !area ? (
@@ -398,7 +401,9 @@ export function CoursesRoute() {
               </div>
             )}
           </PinMap>
-          <p className="mt-2 text-center text-[11px] text-ink-3">Drag or zoom the map to search that area. Course data © OpenStreetMap contributors. Course data supplied by DiscGolfAPI.</p>
+          <p className="mt-2 text-center text-[11px] text-ink-3">
+            Drag or zoom the map to search that area. Course data © OpenStreetMap contributors. Course data supplied by DiscGolfAPI.{merged.some((c) => c.source === "places") ? " Powered by Google." : ""}
+          </p>
         </div>
       ) : (
         <div className="mt-3 px-4">
@@ -441,7 +446,11 @@ export function CoursesRoute() {
             />
           )}
           {merged.length > 0 && <CourseList courses={merged} units={units} onOpen={open} />}
-          {courses && <p className="mt-3 text-center text-[11px] text-ink-3">Course data © OpenStreetMap contributors. Course data supplied by DiscGolfAPI.</p>}
+          {courses && (
+            <p className="mt-3 text-center text-[11px] text-ink-3">
+              Course data © OpenStreetMap contributors. Course data supplied by DiscGolfAPI.{merged.some((c) => c.source === "places") ? " Powered by Google." : ""}
+            </p>
+          )}
         </div>
       )}
 
