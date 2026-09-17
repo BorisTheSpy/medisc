@@ -228,7 +228,7 @@ export function CoursesRoute() {
 
   function recenter() {
     if (geo.position) goToDevice(geo.position, true);
-    else geo.locate();
+    geo.locate();
   }
 
   const showingSearch = searchResults !== null;
@@ -245,7 +245,7 @@ export function CoursesRoute() {
             <IconButton label="Refresh" onClick={() => area && load(area, true)} disabled={!area || loading}>
               <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
             </IconButton>
-            <IconButton label="Go to my location" onClick={recenter} disabled={geo.loading}>
+            <IconButton label="Go to my location" onClick={recenter}>
               <LocateFixed size={22} className={geo.loading ? "animate-pulse" : ""} />
             </IconButton>
           </>
@@ -286,6 +286,14 @@ export function CoursesRoute() {
                 {p.label}
               </button>
             ))}
+          </div>
+        )}
+        {geo.error && (
+          <div className="mt-3 rounded-card bg-surface-2 px-4 py-3 text-sm text-ink-2">
+            {geo.error}
+            <button className="ml-2 font-semibold text-birdie" onClick={geo.locate}>
+              Try again
+            </button>
           </div>
         )}
         {!showingSearch && (
@@ -342,8 +350,8 @@ export function CoursesRoute() {
           title={geo.loading ? "Finding your location" : "Where are you playing?"}
           body={geo.error ?? "Allow location access to see courses around you, or type a course name or city above."}
           action={
-            <Button variant="brand" onClick={geo.locate} disabled={geo.loading}>
-              {geo.loading ? <Spinner /> : <LocateFixed size={18} />} Use my location
+            <Button variant="brand" onClick={geo.locate}>
+              {geo.loading ? <Spinner /> : <LocateFixed size={18} />} {geo.loading ? "Finding you… tap to retry" : "Use my location"}
             </Button>
           }
         />
@@ -407,7 +415,6 @@ export function CoursesRoute() {
         </div>
       ) : (
         <div className="mt-3 px-4">
-          {geo.error && !area.fromDevice && <div className="mb-3 rounded-card bg-surface-2 px-4 py-3 text-sm text-ink-2">{geo.error}</div>}
           {error && (
             <div className="mb-3 rounded-card bg-danger/10 px-4 py-3 text-sm text-ink">
               {courses && courses.length > 0 ? "Some sources did not answer. " : ""}

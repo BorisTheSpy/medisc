@@ -9,11 +9,17 @@ export interface GeoState {
   supported: boolean;
 }
 
+const IOS = typeof navigator !== "undefined" && /iPhone|iPad|iPod/.test(navigator.userAgent);
+
 const ERRORS: Record<number, string> = {
-  1: "Location access was denied. Allow it in your browser settings or search for a place instead.",
-  2: "Your location could not be determined. Check that location services are on.",
-  3: "Finding your location took too long. Try again.",
+  1: IOS
+    ? "Location is blocked for this site. In iOS Settings go to Privacy & Security, Location Services, Safari Websites and choose Ask or Allow. Then in Safari tap the AA button, Website Settings, and set Location to Ask or Allow."
+    : "Location access was denied. Allow it in your browser settings or search for a place instead.",
+  2: "Your location could not be determined. Check that Location Services are turned on for this device.",
+  3: "Finding your location took too long. Move somewhere with a clearer view of the sky and try again.",
 };
+
+const TIMEOUT_MS = 20_000;
 
 /**
  * Coarse fix on demand, then a high-accuracy watch while `watch` is true and the tab is visible.
@@ -22,6 +28,8 @@ export function useGeolocation(watch = false): GeoState & { locate: () => void }
   const supported = typeof navigator !== "undefined" && "geolocation" in navigator;
   const [state, setState] = useState<GeoState>({ position: null, error: null, loading: false, permission: "unknown", supported });
   const watchId = useRef<number | null>(null);
+  const requestSeq = useRef(0);
+  const safetyTimer = useRef<number | null>(null);
 
   useEffect(() => {
     if (!supported || !("permissions" in navigator)) return;
@@ -58,13 +66,31 @@ export function useGeolocation(watch = false): GeoState & { locate: () => void }
     setState((s) => ({ ...s, loading: false, error: ERRORS[err.code] ?? err.message }));
   }, []);
 
+  /**
+   * Request a fix. Every call starts a fresh request so a tap always does something, even if an earlier
+   * request (for example the automatic one on page load) never came back. iOS Safari can leave a request
+   * hanging when its prompt is dismissed, so a safety timer also clears the loading state.
+   */
   const locate = useCallback(() => {
     if (!supported) {
       setState((s) => ({ ...s, error: "This browser does not support location." }));
       return;
     }
+    const seq = ++requestSeq.current;
     setState((s) => ({ ...s, loading: true, error: null }));
-    navigator.geolocation.getCurrentPosition(onPosition, onError, { enableHighAccuracy: false, maximumAge: 60_000, timeout: 10_000 });
+    if (safetyTimer.current) window.clearTimeout(safetyTimer.current);
+    safetyTimer.current = window.setTimeout(() => {
+      if (requestSeq.current === seq) setState((s) => (s.loading ? { ...s, loading: false, error: ERRORS[3] } : s));
+    }, TIMEOUT_MS + 2_000);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (requestSeq.current === seq) onPosition(pos);
+      },
+      (err) => {
+        if (requestSeq.current === seq) onError(err);
+      },
+      { enableHighAccuracy: false, maximumAge: 60_000, timeout: TIMEOUT_MS },
+    );
   }, [supported, onPosition, onError]);
 
   useEffect(() => {
