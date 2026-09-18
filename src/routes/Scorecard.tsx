@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router";
 import { ChevronLeft, ChevronRight, Map as MapIcon, MoreHorizontal, Minus, Plus, Flag, Trash2, UserPlus, UserMinus, Undo2, Target, Crosshair } from "lucide-react";
 import { useCourse, useHoles, usePlayers, useRound, useRoundScores, useSetting } from "@/db/hooks";
 import { addPlayerToRound, adjustStrokes, createPlayer, deleteRound, finishRound, removePlayerFromRound, setHolePar, setSetting, setThrows, updateHole } from "@/db/repo";
-import { publishCourse } from "@/services/community";
+import { publishCourseNow } from "@/services/community";
 import { useGeolocation } from "@/services/useGeolocation";
 import { formatHoleDistance, haversineM, type Units } from "@/domain/geo";
 import { formatToPar, roundTotals, scoreLabel, isHoledOut } from "@/domain/scoring";
@@ -85,8 +85,8 @@ export function ScorecardRoute() {
       next.path = [next.tee, next.basket];
     }
     await updateHole(next);
-    publishCourse(course.id);
-    notify(`${what === "tee" ? "Tee" : "Basket"} saved for hole ${holeNumber} (±${Math.round(formatAccuracyFt(pos.accuracy))} ft). Shared with everyone.`);
+    const shared = await publishCourseNow(course.id);
+    notify(`${what === "tee" ? "Tee" : "Basket"} saved for hole ${holeNumber} (±${Math.round(formatAccuracyFt(pos.accuracy))} ft). ${shared ? "Shared with everyone." : "Will share when back online."}`);
   }
 
   const order = useMemo(() => {

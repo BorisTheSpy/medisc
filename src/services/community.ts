@@ -83,29 +83,87 @@ export function mergeHoles(local: Hole[], shared: Hole[]): { merged: Hole[]; cha
 }
 
 const pending = new Map<string, number>();
+const DIRTY_KEY = "community.dirty";
 
-/** Push a course's holes to the shared database. Debounced per course so rapid edits send once. */
-export function publishCourse(courseId: string, delayMs = 1500): void {
+async function getDirty(): Promise<string[]> {
+  const row = await db.settings.get(DIRTY_KEY).catch(() => undefined);
+  return Array.isArray(row?.value) ? (row!.value as string[]) : [];
+}
+
+async function setDirty(ids: string[]): Promise<void> {
+  await db.settings.put({ key: DIRTY_KEY, value: ids }).catch(() => {});
+}
+
+async function markDirty(courseId: string): Promise<void> {
+  const ids = await getDirty();
+  if (!ids.includes(courseId)) await setDirty([...ids, courseId]);
+}
+
+async function clearDirty(courseId: string): Promise<void> {
+  await setDirty((await getDirty()).filter((id) => id !== courseId));
+}
+
+/** Push one course's layout now. Returns true when the server accepted it. */
+export async function publishCourseNow(courseId: string): Promise<boolean> {
+  const course = await db.courses.get(courseId);
+  if (!course || course.tags?.__needsLocation) return false;
+  const holes = (await db.holes.where("courseId").equals(courseId).toArray()).sort((a, b) => a.number - b.number);
+  const body = {
+    course: { name: course.name, lat: course.lat, lon: course.lon, holeCount: holes.length || course.holeCount, par: course.par ?? null, city: course.city ?? null, region: course.region ?? null, source: course.source },
+    holes: holes.map((h) => ({ number: h.number, par: h.par, distanceM: h.distanceM ?? null, tee: h.tee ?? null, basket: h.basket ?? null, updatedAt: h.updatedAt })),
+  };
+  try {
+    const res = await fetch(`/api/community/courses/${encodeURIComponent(courseKey(course))}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), keepalive: true });
+    if (!res.ok) throw new Error(String(res.status));
+    await clearDirty(courseId);
+    return true;
+  } catch {
+    await markDirty(courseId);
+    return false;
+  }
+}
+
+/**
+ * Push a course's holes to the shared database. Marks the course dirty first so a failed or
+ * interrupted upload is retried on the next launch, reconnect or return to the foreground.
+ */
+export function publishCourse(courseId: string, delayMs = 400): void {
+  void markDirty(courseId);
   const existing = pending.get(courseId);
   if (existing) window.clearTimeout(existing);
   pending.set(
     courseId,
-    window.setTimeout(async () => {
+    window.setTimeout(() => {
       pending.delete(courseId);
-      try {
-        const course = await db.courses.get(courseId);
-        if (!course || course.tags?.__needsLocation) return;
-        const holes = (await db.holes.where("courseId").equals(courseId).toArray()).sort((a, b) => a.number - b.number);
-        const body = {
-          course: { name: course.name, lat: course.lat, lon: course.lon, holeCount: holes.length || course.holeCount, par: course.par ?? null, city: course.city ?? null, region: course.region ?? null, source: course.source },
-          holes: holes.map((h) => ({ number: h.number, par: h.par, distanceM: h.distanceM ?? null, tee: h.tee ?? null, basket: h.basket ?? null, updatedAt: h.updatedAt })),
-        };
-        await fetch(`/api/community/courses/${encodeURIComponent(courseKey(course))}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      } catch {
-        /* offline: the next edit will retry */
-      }
+      void publishCourseNow(courseId);
     }, delayMs),
   );
+}
+
+/** Retry anything that never made it out, plus a one-time sweep of every locally mapped course. */
+export async function flushPendingPublishes(): Promise<void> {
+  const ids = new Set(await getDirty());
+  const swept = await db.settings.get("community.swept").catch(() => undefined);
+  if (!swept) {
+    const mapped = await db.holes.filter((h) => !!(h.tee || h.basket)).toArray();
+    for (const h of mapped) ids.add(h.courseId);
+    const edited = await db.courses.filter((c) => !!c.tags?.__edited).toArray();
+    for (const c of edited) ids.add(c.id);
+    await db.settings.put({ key: "community.swept", value: Date.now() }).catch(() => {});
+  }
+  for (const id of ids) await publishCourseNow(id);
+}
+
+let flushHooksInstalled = false;
+export function installPublishRetries(): void {
+  if (flushHooksInstalled) return;
+  flushHooksInstalled = true;
+  const run = () => void flushPendingPublishes().catch(() => {});
+  window.setTimeout(run, 1500);
+  window.addEventListener("online", run);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") run();
+  });
 }
 
 /** Courses other players have added or mapped, as nearby candidates. */

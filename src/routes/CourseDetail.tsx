@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router";
 import { Play, Pencil, RefreshCw, ExternalLink } from "lucide-react";
 import { useAllScores, useCourse, useHoles, useMe, useRounds, useSetting } from "@/db/hooks";
 import { fetchCourseHoles } from "@/services/overpass";
-import { fetchCommunityHoles, mergeHoles } from "@/services/community";
+import { fetchCommunityHoles, mergeHoles, publishCourseNow } from "@/services/community";
 import { saveHoles, setSetting } from "@/db/repo";
 import { db } from "@/db/db";
 import { useGeolocation } from "@/services/useGeolocation";
@@ -29,6 +29,7 @@ export function CourseDetailRoute() {
   const [fetching, setFetching] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [activeHole, setActiveHole] = useState<number | undefined>(undefined);
+  const [shareState, setShareState] = useState<"idle" | "busy" | "done" | "failed">("idle");
   const attempted = useRef(false);
 
   const needsFetch = course && course.source !== "custom" && !course.fetchedHolesAt;
@@ -180,6 +181,29 @@ export function CourseDetailRoute() {
           </div>
         )}
       </div>
+
+      {mapped > 0 && (
+        <Section className="mt-4">
+          <div className="flex items-center justify-between rounded-card bg-surface px-4 py-3 shadow-card">
+            <div className="text-sm">
+              <div className="font-semibold">
+                {mapped} of {holes.length} holes have pins
+              </div>
+              <div className="text-xs text-ink-3">{shareState === "done" ? "Shared with everyone just now." : shareState === "failed" ? "Could not reach the server. Will retry." : "Pins are shared with every player automatically."}</div>
+            </div>
+            <Button
+              size="sm"
+              disabled={shareState === "busy"}
+              onClick={async () => {
+                setShareState("busy");
+                setShareState((await publishCourseNow(course.id)) ? "done" : "failed");
+              }}
+            >
+              {shareState === "busy" ? <Spinner className="h-4 w-4" /> : <RefreshCw size={14} />} Share now
+            </Button>
+          </div>
+        </Section>
+      )}
 
       {mine && (
         <Section title="Your record here" className="mt-6">
