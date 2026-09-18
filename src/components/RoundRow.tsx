@@ -15,6 +15,16 @@ export function RoundRow({ round, scores, players, meId, onClick, subtitle }: { 
     return better + 1;
   }, [mine, round.playerIds, totals]);
   const under = mine && mine.toPar < 0;
+  const leader = useMemo(() => {
+    if (mine) return null;
+    let best: { id: string; toPar: number; strokes: number; holes: number } | null = null;
+    for (const id of round.playerIds) {
+      const t = totals.get(id);
+      if (t && t.holesScored > 0 && (!best || t.toPar < best.toPar)) best = { id, toPar: t.toPar, strokes: t.strokes, holes: t.holesScored };
+    }
+    return best;
+  }, [mine, round.playerIds, totals]);
+  const leaderName = leader ? (players.find((p) => p.id === leader.id)?.name.split(" ")[0] ?? "?") : null;
   return (
     <button onClick={onClick} className="flex w-full items-center gap-3 border-b hairline px-4 py-3 text-left last:border-b-0 active:bg-surface-2">
       <div className="min-w-0 flex-1">
@@ -26,8 +36,10 @@ export function RoundRow({ round, scores, players, meId, onClick, subtitle }: { 
         </div>
       </div>
       <div className="text-right">
-        <div className={cx("display numeric text-[26px]", under ? "text-birdie" : mine && mine.toPar > 0 ? "text-triple" : "")}>{mine && mine.holesScored ? formatToPar(mine.toPar) : "–"}</div>
-        <div className="numeric text-xs text-ink-3">{mine ? `${mine.strokes} · ${mine.holesScored} holes` : "not on card"}</div>
+        <div className={cx("display numeric text-[26px]", under ? "text-birdie" : mine && mine.toPar > 0 ? "text-triple" : !mine && leader ? "text-ink-2" : "")}>
+          {mine && mine.holesScored ? formatToPar(mine.toPar) : leader ? formatToPar(leader.toPar) : "–"}
+        </div>
+        <div className="numeric text-xs text-ink-3">{mine ? `${mine.strokes} · ${mine.holesScored} holes` : leader ? `${leaderName} · you're not on this card` : "no scores"}</div>
       </div>
       <ChevronRight size={18} className="shrink-0 text-ink-3" />
     </button>

@@ -83,7 +83,7 @@ async function ensureCourse(courseId: string, courseName: string): Promise<void>
 async function applyRemote(players: Player[], rounds: RoundDoc[]): Promise<void> {
   for (const p of players) {
     const local = await db.players.get(p.id);
-    if (!local || p.updatedAt >= local.updatedAt) await db.players.put({ ...p, isMe: p.id === getUser()?.id ? true : local?.isMe ?? false });
+    if (!local || p.updatedAt >= local.updatedAt) await db.players.put({ ...p, isMe: p.id === getUser()?.id ? true : (local?.isMe ?? false) && !p.deletedAt });
   }
   for (const doc of rounds) {
     const { scores, ...round } = doc;
@@ -92,10 +92,13 @@ async function applyRemote(players: Player[], rounds: RoundDoc[]): Promise<void>
     await ensureCourse(round.courseId, round.courseName);
     await db.transaction("rw", db.rounds, db.holeScores, async () => {
       await db.rounds.put(round);
+      const keep = new Set(scores.map((s) => s.id));
       for (const s of scores) {
         const ls = await db.holeScores.get(s.id);
         if (!ls || s.updatedAt >= ls.updatedAt) await db.holeScores.put(s);
       }
+      const stale = (await db.holeScores.where("roundId").equals(round.id).toArray()).filter((s) => !keep.has(s.id));
+      for (const s of stale) await db.holeScores.delete(s.id);
     });
   }
 }

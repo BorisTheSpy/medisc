@@ -269,7 +269,8 @@ export async function mergePlayerInto(fromId: string, toId: string, ensure?: { n
       const playerIds = alreadyThere ? r.playerIds.filter((id) => id !== fromId) : r.playerIds.map((id) => (id === fromId ? toId : id));
       await db.rounds.update(r.id, { playerIds, updatedAt: now });
     }
-    await db.players.delete(fromId);
+    // Tombstone rather than delete so the merge reaches other devices through sync.
+    if (from) await db.players.put({ ...from, deletedAt: now, updatedAt: now });
   });
 }
 

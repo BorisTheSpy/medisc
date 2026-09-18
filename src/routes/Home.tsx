@@ -7,6 +7,8 @@ import { roundTotals } from "@/domain/scoring";
 import { formatToPar } from "@/domain/scoring";
 import { formatRoundDate } from "@/lib/format";
 import { Button, Card, IconButton, Section, EmptyState } from "@/components/ui";
+import { mergePlayerInto } from "@/db/repo";
+import { useState } from "react";
 import { Logo } from "@/components/Logo";
 import { RoundRow } from "@/components/RoundRow";
 
@@ -19,6 +21,18 @@ export function HomeRoute() {
   const live = useLiveRound();
 
   const finished = useMemo(() => rounds.filter((r) => r.finishedAt), [rounds]);
+  const [dismissed, setDismissed] = useState(false);
+  // Rounds that list another player but not me, e.g. after a UDisc import: offer to claim them.
+  const orphan = useMemo(() => {
+    if (!me || dismissed) return null;
+    const mineCount = finished.filter((r) => r.playerIds.includes(me.id)).length;
+    const counts = new Map<string, number>();
+    for (const r of finished) if (!r.playerIds.includes(me.id)) for (const id of r.playerIds) counts.set(id, (counts.get(id) ?? 0) + 1);
+    const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (!top || top[1] === 0 || (mineCount > 0 && top[1] < mineCount)) return null;
+    const player = players.find((p) => p.id === top[0] && !p.deletedAt);
+    return player ? { player, count: top[1] } : null;
+  }, [me, finished, players, dismissed]);
   const stats = useMemo(() => (me ? overview(finished, scores, me.id) : null), [finished, scores, me]);
   const streak = useMemo(() => weeklyStreak(finished), [finished]);
   const liveTotals = useMemo(() => (live ? roundTotals(scores.filter((s) => s.roundId === live.id)) : null), [live, scores]);
@@ -47,6 +61,32 @@ export function HomeRoute() {
           </p>
         )}
       </header>
+
+      {orphan && (
+        <div className="mt-6 px-4">
+          <div className="rounded-card bg-surface p-4 shadow-card">
+            <div className="font-semibold">
+              {orphan.count} {orphan.count === 1 ? "round lists" : "rounds list"} “{orphan.player.name}” but not you
+            </div>
+            <p className="mt-1 text-sm text-ink-2">If that's you under another name, claim those rounds and they'll count toward your stats.</p>
+            <div className="mt-3 flex gap-2">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={async () => {
+                  if (!me) return;
+                  await mergePlayerInto(orphan.player.id, me.id, { name: me.name, color: me.color, isMe: true });
+                }}
+              >
+                Yes, that's me
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setDismissed(true)}>
+                No, someone else
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-6 px-4">
         {live ? (
