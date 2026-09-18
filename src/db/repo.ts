@@ -232,10 +232,44 @@ export async function updateRound(roundId: string, patch: Partial<Round>): Promi
   await db.rounds.update(roundId, { ...patch, updatedAt: Date.now() });
 }
 
+/** Soft delete so the deletion syncs to other devices; lists already hide tombstones. */
 export async function deleteRound(roundId: string): Promise<void> {
-  await db.transaction("rw", db.rounds, db.holeScores, async () => {
-    await db.holeScores.where("roundId").equals(roundId).delete();
-    await db.rounds.delete(roundId);
+  const now = Date.now();
+  await db.rounds.update(roundId, { deletedAt: now, updatedAt: now });
+}
+
+/**
+ * Fold one player into another: all their scores and card memberships move over, then the source
+ * player is removed. Used for "This is me" and when an account id replaces the local me player.
+ */
+export async function mergePlayerInto(fromId: string, toId: string, ensure?: { name: string; color: string; isMe: boolean }): Promise<void> {
+  if (fromId === toId) return;
+  await db.transaction("rw", db.players, db.rounds, db.holeScores, async () => {
+    const now = Date.now();
+    const from = await db.players.get(fromId);
+    const to = await db.players.get(toId);
+    if (!to) {
+      await db.players.put({ id: toId, name: ensure?.name ?? from?.name ?? "Me", color: ensure?.color ?? from?.color ?? "#E9A83A", isMe: ensure?.isMe ?? from?.isMe ?? false, lastPlayedAt: from?.lastPlayedAt, createdAt: now, updatedAt: now });
+    } else if (ensure?.isMe && !to.isMe) {
+      await db.players.update(toId, { isMe: true, updatedAt: now });
+    }
+    const rounds = await db.rounds.where("playerIds").equals(fromId).toArray();
+    for (const r of rounds) {
+      const alreadyThere = r.playerIds.includes(toId);
+      const scores = await db.holeScores.where("[roundId+playerId]").equals([r.id, fromId]).toArray();
+      for (const sc of scores) {
+        if (alreadyThere) {
+          // Both on the same card: keep the destination's scores, drop the duplicate's.
+          await db.holeScores.delete(sc.id);
+        } else {
+          await db.holeScores.delete(sc.id);
+          await db.holeScores.put({ ...sc, id: `${r.id}-${toId}-${sc.holeNumber}`, playerId: toId, updatedAt: now });
+        }
+      }
+      const playerIds = alreadyThere ? r.playerIds.filter((id) => id !== fromId) : r.playerIds.map((id) => (id === fromId ? toId : id));
+      await db.rounds.update(r.id, { playerIds, updatedAt: now });
+    }
+    await db.players.delete(fromId);
   });
 }
 

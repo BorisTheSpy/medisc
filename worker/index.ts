@@ -333,6 +333,12 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS holes (course_key TEXT NOT NULL, number INTEGER NOT NULL, par INTEGER NOT NULL, distance_m INTEGER, tee_lat REAL, tee_lon REAL, basket_lat REAL, basket_lon REAL, updated_at INTEGER NOT NULL, PRIMARY KEY (course_key, number))`,
   `CREATE TABLE IF NOT EXISTS hole_history (id INTEGER PRIMARY KEY AUTOINCREMENT, course_key TEXT NOT NULL, number INTEGER NOT NULL, payload TEXT NOT NULL, updated_at INTEGER NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS hole_history_course ON hole_history (course_key, updated_at)`,
+  `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL, pin_hash TEXT NOT NULL, created_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id TEXT NOT NULL, created_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS sync_players (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, payload TEXT NOT NULL, updated_at INTEGER NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS sync_players_user ON sync_players (user_id, updated_at)`,
+  `CREATE TABLE IF NOT EXISTS sync_rounds (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, payload TEXT NOT NULL, updated_at INTEGER NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS sync_rounds_user ON sync_rounds (user_id, updated_at)`,
 ];
 let schemaReady: Promise<void> | null = null;
 /** Idempotent, runs once per isolate. Lets the Worker deploy from git without a separate migration step. */
@@ -522,6 +528,132 @@ app.post("/api/community/courses/:key/restore", async (c) => {
   if (statements.length) await db.batch(statements);
   const holes = await db.prepare("SELECT * FROM holes WHERE course_key = ? ORDER BY number").bind(key).all<Record<string, unknown>>();
   return c.json({ enabled: true, restored: numbers.size, holes: holes.results.map(rowToHole) });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Accounts: deliberately simple. A username plus a 4-digit PIN keeps people's stats apart and lets
+// them sign in on another phone. PINs are salted and hashed; sessions are random tokens.
+// ---------------------------------------------------------------------------------------------
+
+const USERNAME_RE = /^[a-z0-9_.-]{2,24}$/;
+const PIN_RE = /^\d{4,8}$/;
+
+async function pinHash(username: string, pin: string): Promise<string> {
+  return sha256(`medisc:${username}:${pin}`);
+}
+
+function randomToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+interface UserRow {
+  id: string;
+  username: string;
+  display_name: string;
+}
+
+async function currentUser(c: { req: { header(name: string): string | undefined }; env: Env }): Promise<UserRow | null> {
+  const db = c.env.DB;
+  if (!db) return null;
+  const auth = c.req.header("Authorization") ?? "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+  if (!/^[0-9a-f]{48}$/.test(token)) return null;
+  await ensureSchema(db);
+  const row = await db.prepare("SELECT u.id, u.username, u.display_name FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?").bind(token).first<UserRow>();
+  return row ?? null;
+}
+
+app.post("/api/auth/register", async (c) => {
+  const db = c.env.DB;
+  if (!db) return c.json({ error: "Accounts are not available" }, 503);
+  await ensureSchema(db);
+  const body = await c.req.json<{ username?: string; pin?: string; displayName?: string }>().catch(() => ({}) as { username?: string; pin?: string; displayName?: string });
+  const username = String(body.username ?? "").trim().toLowerCase();
+  const pin = String(body.pin ?? "").trim();
+  const displayName = String(body.displayName ?? username).trim().slice(0, 40) || username;
+  if (!USERNAME_RE.test(username)) return c.json({ error: "Username: 2 to 24 letters, numbers, dots, dashes or underscores." }, 400);
+  if (!PIN_RE.test(pin)) return c.json({ error: "PIN must be 4 to 8 digits." }, 400);
+  const exists = await db.prepare("SELECT id FROM users WHERE username = ?").bind(username).first();
+  if (exists) return c.json({ error: "That username is taken." }, 409);
+  const id = crypto.randomUUID();
+  const token = randomToken();
+  const now = Date.now();
+  await db.batch([
+    db.prepare("INSERT INTO users (id, username, display_name, pin_hash, created_at) VALUES (?, ?, ?, ?, ?)").bind(id, username, displayName, await pinHash(username, pin), now),
+    db.prepare("INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)").bind(token, id, now),
+  ]);
+  return c.json({ token, user: { id, username, displayName } });
+});
+
+app.post("/api/auth/login", async (c) => {
+  const db = c.env.DB;
+  if (!db) return c.json({ error: "Accounts are not available" }, 503);
+  await ensureSchema(db);
+  const body = await c.req.json<{ username?: string; pin?: string }>().catch(() => ({}) as { username?: string; pin?: string });
+  const username = String(body.username ?? "").trim().toLowerCase();
+  const pin = String(body.pin ?? "").trim();
+  const row = await db.prepare("SELECT id, username, display_name, pin_hash FROM users WHERE username = ?").bind(username).first<UserRow & { pin_hash: string }>();
+  if (!row || row.pin_hash !== (await pinHash(username, pin))) return c.json({ error: "Wrong username or PIN." }, 401);
+  const token = randomToken();
+  await db.prepare("INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)").bind(token, row.id, Date.now()).run();
+  return c.json({ token, user: { id: row.id, username: row.username, displayName: row.display_name } });
+});
+
+app.get("/api/auth/me", async (c) => {
+  const user = await currentUser(c);
+  if (!user) return c.json({ user: null }, 401);
+  return c.json({ user: { id: user.id, username: user.username, displayName: user.display_name } });
+});
+
+app.post("/api/auth/logout", async (c) => {
+  const db = c.env.DB;
+  const auth = c.req.header("Authorization") ?? "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+  if (db && token) await db.prepare("DELETE FROM sessions WHERE token = ?").bind(token).run();
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Sync: each round (with its hole scores) and each player is one JSON document owned by a user.
+// Last write wins by updated_at. Deletes are tombstones inside the document (deletedAt).
+// ---------------------------------------------------------------------------------------------
+
+interface SyncDoc {
+  id: string;
+  updatedAt: number;
+  [k: string]: unknown;
+}
+
+app.post("/api/sync", async (c) => {
+  const db = c.env.DB;
+  const user = await currentUser(c);
+  if (!db || !user) return c.json({ error: "Sign in to sync" }, 401);
+  const body = await c.req.json<{ since?: number; players?: SyncDoc[]; rounds?: SyncDoc[] }>().catch(() => ({}) as { since?: number; players?: SyncDoc[]; rounds?: SyncDoc[] });
+  const since = isNum(body.since) ? body.since : 0;
+  const now = Date.now();
+  const statements: D1PreparedStatement[] = [];
+  const upsert = (table: string, docs: SyncDoc[] | undefined) => {
+    for (const d of (docs ?? []).slice(0, 500)) {
+      if (!d || typeof d.id !== "string" || d.id.length > 120) continue;
+      const updatedAt = isNum(d.updatedAt) ? Math.min(d.updatedAt, now) : now;
+      const payload = JSON.stringify(d).slice(0, 200_000);
+      statements.push(
+        db
+          .prepare(`INSERT INTO ${table} (id, user_id, payload, updated_at) VALUES (?1, ?2, ?3, ?4)
+                    ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at
+                    WHERE ${table}.user_id = excluded.user_id AND excluded.updated_at >= ${table}.updated_at`)
+          .bind(d.id, user.id, payload, updatedAt),
+      );
+    }
+  };
+  upsert("sync_players", body.players);
+  upsert("sync_rounds", body.rounds);
+  if (statements.length) await db.batch(statements);
+  const players = await db.prepare("SELECT payload FROM sync_players WHERE user_id = ? AND updated_at > ? ORDER BY updated_at LIMIT 2000").bind(user.id, since).all<{ payload: string }>();
+  const rounds = await db.prepare("SELECT payload FROM sync_rounds WHERE user_id = ? AND updated_at > ? ORDER BY updated_at LIMIT 2000").bind(user.id, since).all<{ payload: string }>();
+  const parse = (rows: { payload: string }[]) => rows.map((r) => JSON.parse(r.payload) as SyncDoc);
+  return c.json({ now, players: parse(players.results), rounds: parse(rounds.results) }, 200, { "Cache-Control": "no-store" });
 });
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));

@@ -5,9 +5,12 @@ import { registerSW } from "virtual:pwa-register";
 import "./index.css";
 import { router } from "./router";
 import { applyStoredTheme } from "./lib/theme";
+import { installSyncHooks, scheduleSync } from "./services/sync";
 
 applyStoredTheme();
 registerSW({ immediate: true });
+installSyncHooks();
+scheduleSync(800);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

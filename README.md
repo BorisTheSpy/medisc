@@ -10,7 +10,7 @@ A disc golf scorecard web app in the spirit of UDisc: find the course you are st
 - **Round history** grouped by month with winner, score grid with birdie and bogey colouring, throw stats, share, edit and delete.
 - **Stats dashboard**: form over time, score mix, best rounds, best shots (aces, birdie streaks), fairway hit, circle in regulation, putting and scramble rates, per-course records and head-to-head against cardmates.
 
-Everything is stored on the device in IndexedDB. There is no account. Use Settings to download or restore a JSON backup.
+Everyone has a simple account: a username and a 4-digit PIN, nothing more. Rounds, scores and cardmates sync to the account through the Worker and D1, so stats are per person and follow you to any phone. The device keeps a full local copy in IndexedDB, so scoring works with no signal and uploads later. Settings can also download or restore a JSON backup.
 
 ## Stack
 
@@ -43,6 +43,12 @@ bun run deploy     # vite build + wrangler deploy
 The Worker is named `medisc` in `wrangler.jsonc`. After the first deploy the app is live at `https://medisc.<your-subdomain>.workers.dev`. Add a custom domain from the Worker's settings if you like.
 
 For git-based deploys, connect the repository under Workers & Pages > Create > Connect to Git. The Worker name in the dashboard must match `name` in `wrangler.jsonc`. Build command `bun run build`, deploy command `bunx wrangler deploy`.
+
+## Accounts and sync
+
+`POST /api/auth/register`, `/api/auth/login`, `/api/auth/logout`, `GET /api/auth/me`. PINs are salted and hashed; sessions are random bearer tokens kept in localStorage. This is deliberately light: it keeps people's stats apart, it is not meant to protect anything sensitive.
+
+`POST /api/sync` takes `{ since, players, rounds }` (each round carries its hole scores) and returns everything changed for that user since `since`. Last write wins by `updatedAt`; deletes are tombstones. The client syncs a couple of seconds after any local write, on reconnect, and when the app comes to the foreground.
 
 ## Shared course layouts (D1)
 

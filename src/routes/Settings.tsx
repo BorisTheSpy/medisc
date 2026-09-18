@@ -6,7 +6,11 @@ import { clearCaches, exportAll, importAll, setSetting, updatePlayer } from "@/d
 import { applyTheme, getThemePref, type ThemePref } from "@/lib/theme";
 import type { Units } from "@/domain/geo";
 import { Button, Field, PageHeader, Section, Segmented, Toast } from "@/components/ui";
-import { LocateFixed, FileDown } from "lucide-react";
+import { LocateFixed, FileDown, LogOut, UserCheck, RefreshCw } from "lucide-react";
+import { useUser, login, register, logout } from "@/services/auth";
+import { adoptAccount, syncNow } from "@/services/sync";
+import { usePlayers, useRounds } from "@/db/hooks";
+import { mergePlayerInto } from "@/db/repo";
 import { importUdiscCsv } from "@/db/importUdisc";
 import { getSetting } from "@/db/repo";
 import type { LatLon } from "@/domain/types";
@@ -43,6 +47,56 @@ export function SettingsRoute() {
   const fileRef = useRef<HTMLInputElement>(null);
   const udiscRef = useRef<HTMLInputElement>(null);
   const [udiscStatus, setUdiscStatus] = useState<string>("");
+  const user = useUser();
+  const players = usePlayers();
+  const rounds = useRounds();
+  const [acctMode, setAcctMode] = useState<"create" | "signin">("signin");
+  const [acctUser, setAcctUser] = useState("");
+  const [acctPin, setAcctPin] = useState("");
+  const [acctBusy, setAcctBusy] = useState(false);
+  const [acctError, setAcctError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+
+  async function submitAccount(e: React.FormEvent) {
+    e.preventDefault();
+    setAcctBusy(true);
+    setAcctError(null);
+    try {
+      const u = acctMode === "create" ? await register(acctUser.trim(), acctPin.trim(), me?.name ?? acctUser.trim()) : await login(acctUser.trim(), acctPin.trim());
+      await adoptAccount(u);
+      notify(`Signed in as ${u.username}`);
+      setAcctUser("");
+      setAcctPin("");
+    } catch (err) {
+      setAcctError(err instanceof Error ? err.message : "Could not sign in");
+    } finally {
+      setAcctBusy(false);
+    }
+  }
+
+  async function runSync() {
+    setSyncing(true);
+    try {
+      await syncNow();
+      notify("Synced");
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  function roundsWith(playerId: string): number {
+    return rounds.filter((r) => r.playerIds.includes(playerId)).length;
+  }
+
+  async function thisIsMe(playerId: string) {
+    if (!me) return;
+    const p = players.find((x) => x.id === playerId);
+    if (!p || !confirm(`Treat "${p.name}" as you? Their ${roundsWith(playerId)} rounds will count toward your stats.`)) return;
+    await mergePlayerInto(playerId, me.id, { name: me.name, color: me.color, isMe: true });
+    notify(`Merged ${p.name} into you`);
+  }
 
   async function importUdisc(file: File) {
     setUdiscStatus("Reading file…");
@@ -106,6 +160,78 @@ export function SettingsRoute() {
             Save
           </Button>
         </div>
+      </Section>
+
+      <Section title="Account" className="mt-6">
+        {user ? (
+          <div className="rounded-card bg-surface p-4 shadow-card">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-semibold">@{user.username}</div>
+                <div className="text-xs text-ink-3">Your rounds sync to this account.</div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={runSync} disabled={syncing}>
+                  <RefreshCw size={14} className={syncing ? "animate-spin" : ""} /> Sync
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={async () => {
+                    await logout();
+                    notify("Signed out. Your rounds stay on this phone.");
+                  }}
+                >
+                  <LogOut size={14} /> Sign out
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={submitAccount} className="rounded-card bg-surface p-4 shadow-card">
+            <p className="mb-3 text-sm text-ink-2">Sign in to back up your rounds and see your stats on any phone. Your existing rounds on this phone come along.</p>
+            <Segmented
+              value={acctMode}
+              onChange={setAcctMode}
+              options={[
+                { value: "signin", label: "Sign in" },
+                { value: "create", label: "Create account" },
+              ]}
+              className="mb-3"
+            />
+            <div className="space-y-2">
+              <Field name="acctUser" value={acctUser} onChange={(e) => setAcctUser(e.target.value.toLowerCase())} placeholder="Username" autoCapitalize="none" autoCorrect="off" maxLength={24} />
+              <Field name="acctPin" type="password" inputMode="numeric" pattern="[0-9]*" value={acctPin} onChange={(e) => setAcctPin(e.target.value.replace(/\D/g, ""))} placeholder="PIN (4 digits)" maxLength={8} />
+            </div>
+            {acctError && <p className="mt-2 text-sm text-danger">{acctError}</p>}
+            <Button type="submit" variant="brand" full className="mt-3" disabled={acctBusy || !/^[a-z0-9_.-]{2,24}$/.test(acctUser.trim()) || !/^\d{4,8}$/.test(acctPin.trim())}>
+              {acctMode === "create" ? "Create account" : "Sign in"}
+            </Button>
+          </form>
+        )}
+      </Section>
+
+      <Section title="Players" className="mt-6">
+        <div className="overflow-hidden rounded-card bg-surface shadow-card">
+          {players
+            .filter((p) => !p.isMe)
+            .map((p) => (
+              <div key={p.id} className="flex items-center gap-3 border-b hairline px-4 py-2.5 last:border-b-0">
+                <span className="inline-grid h-8 w-8 place-items-center rounded-full text-xs font-bold text-white" style={{ background: p.color }}>
+                  {p.name.slice(0, 2).toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium">{p.name}</div>
+                  <div className="text-xs text-ink-3">{roundsWith(p.id)} rounds together</div>
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => thisIsMe(p.id)} title="Count this player's rounds as yours">
+                  <UserCheck size={14} /> This is me
+                </Button>
+              </div>
+            ))}
+          {players.filter((p) => !p.isMe).length === 0 && <div className="px-4 py-3 text-sm text-ink-3">No other players yet. Add them when you start a round.</div>}
+        </div>
+        <p className="mt-2 text-xs text-ink-3">If an import created a duplicate of you under another name, tap This is me to fold those rounds into your stats.</p>
       </Section>
 
       <Section title="Display" className="mt-6">

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Play, Sparkles } from "lucide-react";
 import { useAllScores, useMe, usePlayers, useRounds } from "@/db/hooks";
-import { bestRounds, bestShots, distribution, filterRange, formSeries, headToHead, overview, perCourse, throwStats, weeklyStreak, type RangeKey } from "@/domain/stats";
+import { bestRounds, bestShots, completedRounds, distribution, filterRange, formSeries, headToHead, overview, perCourse, throwStats, weeklyStreak, type RangeKey } from "@/domain/stats";
 import { formatToPar } from "@/domain/scoring";
 import { avg, pct } from "@/lib/format";
 import { Button, EmptyState, PageHeader, Section, Segmented, StatTile, cx } from "@/components/ui";
@@ -33,10 +33,12 @@ export function StatsRoute() {
   const scores = useAllScores();
   const players = usePlayers();
   const [range, setRange] = useState<RangeKey>("last20");
-
-  const finished = useMemo(() => allRounds.filter((r) => r.finishedAt), [allRounds]);
-  const rounds = useMemo(() => filterRange(finished, range), [finished, range]);
+  const [scope, setScope] = useState<"completed" | "all">("completed");
   const meId = me?.id ?? "";
+
+  const finishedAll = useMemo(() => allRounds.filter((r) => r.finishedAt), [allRounds]);
+  const finished = useMemo(() => (scope === "completed" ? completedRounds(finishedAll, scores, meId) : finishedAll), [finishedAll, scores, meId, scope]);
+  const rounds = useMemo(() => filterRange(finished, range), [finished, range]);
   const o = useMemo(() => overview(rounds, scores, meId), [rounds, scores, meId]);
   const dist = useMemo(() => distribution(rounds, scores, meId), [rounds, scores, meId]);
   const form = useMemo(() => formSeries(rounds, scores, meId), [rounds, scores, meId]);
@@ -51,7 +53,7 @@ export function StatsRoute() {
     return last.length ? last.reduce((a, p) => a + p.toPar, 0) / last.length : null;
   }, [form]);
 
-  if (finished.length === 0) {
+  if (finishedAll.length === 0) {
     return (
       <div>
         <PageHeader title="Stats" />
@@ -76,8 +78,19 @@ export function StatsRoute() {
   return (
     <div>
       <PageHeader title="Stats" sub={`${rounds.length} ${rounds.length === 1 ? "round" : "rounds"} in range`} />
-      <div className="px-4">
+      <div className="space-y-2 px-4">
         <Segmented value={range} onChange={setRange} options={RANGES} className="w-full justify-between" />
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-ink-3">{scope === "completed" ? "Only rounds where you scored every hole" : "Every finished round, even partial ones"}</span>
+          <Segmented
+            value={scope}
+            onChange={setScope}
+            options={[
+              { value: "completed", label: "Completed" },
+              { value: "all", label: "All" },
+            ]}
+          />
+        </div>
       </div>
 
       <Section className="mt-4">

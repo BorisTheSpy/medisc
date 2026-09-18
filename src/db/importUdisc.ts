@@ -124,6 +124,14 @@ export async function importUdiscCsv(text: string, origin: LatLon | null, onProg
 
   const playerCache = new Map<string, Player>();
   const playersBefore = await db.players.count();
+  // The person who exported the file is on every card. If none of the names match me, map that name to me.
+  if (me) {
+    const counts = new Map<string, number>();
+    for (const r of data.rounds) for (const p of r.players) counts.set(p.name, (counts.get(p.name) ?? 0) + 1);
+    const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    const matchesMe = data.playerNames.some((n) => norm(n) === norm(me.name) || norm(n).split(" ")[0] === norm(me.name).split(" ")[0]);
+    if (top && !matchesMe && top[1] === data.rounds.length) playerCache.set(norm(top[0]), me);
+  }
   for (const r of data.rounds) {
     const course = courseByLayout.get(`${r.courseName}|${r.layoutName}`);
     if (!course) continue;

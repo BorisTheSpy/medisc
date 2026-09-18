@@ -45,6 +45,15 @@ export function playerResults(rounds: Round[], scores: HoleScore[], playerId: st
   return results;
 }
 
+/** Rounds where the player has a score on every hole of the round. */
+export function completedRounds(rounds: Round[], scores: HoleScore[], playerId: string): Round[] {
+  const grouped = byRound(scores);
+  return finished(rounds).filter((r) => {
+    const mine = (grouped.get(r.id) ?? []).filter((s) => s.playerId === playerId && s.strokes > 0);
+    return mine.length >= r.holeNumbers.length && r.holeNumbers.length > 0;
+  });
+}
+
 export function filterRange(rounds: Round[], range: RangeKey, now = Date.now()): Round[] {
   const sorted = [...finished(rounds)].sort((a, b) => b.startedAt - a.startedAt);
   switch (range) {
