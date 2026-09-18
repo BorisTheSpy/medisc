@@ -33,7 +33,7 @@ export function StatsRoute() {
   const scores = useAllScores();
   const players = usePlayers();
   const [range, setRange] = useState<RangeKey>("last20");
-  const [scope, setScope] = useState<"completed" | "all">("completed");
+  const [scope, setScope] = useState<"completed" | "all">("all");
   const meId = me?.id ?? "";
 
   const finishedAll = useMemo(() => allRounds.filter((r) => r.finishedAt), [allRounds]);
@@ -86,8 +86,8 @@ export function StatsRoute() {
             value={scope}
             onChange={setScope}
             options={[
-              { value: "completed", label: "Completed" },
               { value: "all", label: "All" },
+              { value: "completed", label: "Completed" },
             ]}
           />
         </div>
