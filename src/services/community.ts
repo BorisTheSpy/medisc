@@ -79,7 +79,15 @@ export function mergeHoles(local: Hole[], shared: Hole[]): { merged: Hole[]; cha
       changed = true;
     }
   }
-  return { merged: [...byNumber.values()].sort((a, b) => a.number - b.number), changed };
+  let merged = [...byNumber.values()].sort((a, b) => a.number - b.number);
+  // If the shared layout is newer than every local hole and shorter, the course was trimmed elsewhere.
+  const newestLocal = Math.max(0, ...local.map((h) => h.updatedAt));
+  const newestShared = Math.max(0, ...shared.map((h) => h.updatedAt));
+  if (shared.length > 0 && shared.length < merged.length && newestShared > newestLocal) {
+    merged = merged.filter((h) => h.number <= shared.length);
+    changed = true;
+  }
+  return { merged, changed };
 }
 
 const pending = new Map<string, number>();

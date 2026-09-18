@@ -106,6 +106,54 @@ export async function updateHole(hole: Hole): Promise<void> {
   });
 }
 
+/**
+ * Remove one hole from a course. Later holes shift down so numbering stays contiguous. Rounds still in
+ * progress on this course are adjusted the same way; finished rounds keep their history untouched.
+ */
+export async function removeHole(courseId: string, number: number): Promise<void> {
+  await db.transaction("rw", db.holes, db.courses, db.rounds, db.holeScores, async () => {
+    const now = Date.now();
+    const holes = (await db.holes.where("courseId").equals(courseId).toArray()).sort((a, b) => a.number - b.number);
+    if (!holes.some((h) => h.number === number) || holes.length <= 1) return;
+    await db.holes.where("courseId").equals(courseId).delete();
+    const next: Hole[] = holes
+      .filter((h) => h.number !== number)
+      .map((h) => (h.number > number ? { ...h, number: h.number - 1, id: `${courseId}-${h.number - 1}`, updatedAt: now } : h));
+    await db.holes.bulkPut(next);
+    const course = await db.courses.get(courseId);
+    await db.courses.update(courseId, { holeCount: next.length, par: next.reduce((a, h) => a + h.par, 0), tags: { ...(course?.tags ?? {}), __edited: "1" }, updatedAt: now });
+
+    const live = (await db.rounds.where("courseId").equals(courseId).toArray()).filter((r) => !r.finishedAt && !r.deletedAt);
+    for (const r of live) {
+      const scores = await db.holeScores.where("roundId").equals(r.id).toArray();
+      await db.holeScores.where("roundId").equals(r.id).delete();
+      const kept = scores
+        .filter((sc) => sc.holeNumber !== number)
+        .map((sc) => (sc.holeNumber > number ? { ...sc, holeNumber: sc.holeNumber - 1, id: `${r.id}-${sc.playerId}-${sc.holeNumber - 1}`, updatedAt: now } : sc));
+      await db.holeScores.bulkPut(kept);
+      const holeNumbers = r.holeNumbers.filter((n) => n !== number).map((n) => (n > number ? n - 1 : n));
+      const startingHole = r.startingHole > number ? r.startingHole - 1 : Math.min(r.startingHole, holeNumbers[holeNumbers.length - 1] ?? 1);
+      await db.rounds.update(r.id, { holeNumbers, startingHole, updatedAt: now });
+    }
+  });
+}
+
+/** Trim or extend a course to exactly `count` holes. Extra holes come off the end; new ones are par 3. */
+export async function setHoleCount(courseId: string, count: number): Promise<void> {
+  const target = Math.max(1, Math.min(36, Math.round(count)));
+  const holes = (await db.holes.where("courseId").equals(courseId).toArray()).sort((a, b) => a.number - b.number);
+  for (let n = holes.length; n > target; n--) await removeHole(courseId, n);
+  if (holes.length < target) {
+    const now = Date.now();
+    const extra: Hole[] = [];
+    for (let n = holes.length + 1; n <= target; n++) extra.push({ id: `${courseId}-${n}`, courseId, number: n, par: 3, updatedAt: now });
+    await db.holes.bulkPut(extra);
+    const all = await db.holes.where("courseId").equals(courseId).toArray();
+    const course = await db.courses.get(courseId);
+    await db.courses.update(courseId, { holeCount: all.length, par: all.reduce((a, h) => a + h.par, 0), tags: { ...(course?.tags ?? {}), __edited: "1" }, updatedAt: now });
+  }
+}
+
 export async function getHoles(courseId: string): Promise<Hole[]> {
   const holes = await db.holes.where("courseId").equals(courseId).toArray();
   return holes.sort((a, b) => a.number - b.number);

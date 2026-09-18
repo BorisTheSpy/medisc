@@ -484,6 +484,7 @@ app.put("/api/community/courses/:key", async (c) => {
     );
     statements.push(db.prepare("INSERT INTO hole_history (course_key, number, payload, updated_at) VALUES (?1, ?2, ?3, ?4)").bind(key, Math.round(h.number), JSON.stringify(h).slice(0, 2000), updatedAt));
   }
+  if (holes.length > 0) statements.push(db.prepare("DELETE FROM holes WHERE course_key = ?1 AND number > ?2").bind(key, holes.length));
   await db.batch(statements);
   const { results } = await db.prepare("SELECT * FROM holes WHERE course_key = ? ORDER BY number").bind(key).all<Record<string, unknown>>();
   return c.json({ enabled: true, holes: results.map(rowToHole) });

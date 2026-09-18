@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { ChevronLeft, ChevronRight, Map as MapIcon, MoreHorizontal, Minus, Plus, Flag, Trash2, UserPlus, UserMinus, Undo2, Target, Crosshair } from "lucide-react";
+import { ChevronLeft, ChevronRight, Map as MapIcon, MoreHorizontal, Minus, Plus, Flag, Trash2, UserPlus, UserMinus, Undo2, Target, Crosshair, ListX } from "lucide-react";
 import { useCourse, useHoles, usePlayers, useRound, useRoundScores, useSetting } from "@/db/hooks";
-import { addPlayerToRound, adjustStrokes, createPlayer, deleteRound, finishRound, removePlayerFromRound, setHolePar, setSetting, setThrows, updateHole } from "@/db/repo";
+import { addPlayerToRound, adjustStrokes, createPlayer, deleteRound, finishRound, removePlayerFromRound, setHolePar, setSetting, setThrows, updateHole, removeHole, setHoleCount } from "@/db/repo";
 import { publishCourseNow } from "@/services/community";
 import { useGeolocation } from "@/services/useGeolocation";
 import { formatHoleDistance, haversineM, type Units } from "@/domain/geo";
@@ -58,6 +58,9 @@ export function ScorecardRoute() {
   const [trackerFor, setTrackerFor] = useState<string | null>(null);
   const [guestName, setGuestName] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const [confirmMark, setConfirmMark] = useState<"tee" | "basket" | null>(null);
+  const [holesOpen, setHolesOpen] = useState(false);
+  const [holeCountInput, setHoleCountInput] = useState("");
   const toastTimer = useRef<number | null>(null);
   function notify(msg: string) {
     setToast(msg);
@@ -66,8 +69,12 @@ export function ScorecardRoute() {
   }
 
   /** Save the phone's current position as this hole's tee or basket, then share it. */
-  async function markHere(what: "tee" | "basket") {
+  async function markHere(what: "tee" | "basket", force = false) {
     if (!round || !course) return;
+    if (!force && hole?.[what]) {
+      setConfirmMark(what);
+      return;
+    }
     const pos = geo.position;
     if (!pos) {
       geo.locate();
@@ -314,6 +321,7 @@ export function ScorecardRoute() {
         <div className="divide-y hairline">
           <MenuItem icon={<Target size={18} />} label={`Change par for hole ${holeNumber}`} onClick={() => (setMenuOpen(false), setParOpen(true))} />
           <MenuItem icon={<UserPlus size={18} />} label="Add or remove players" onClick={() => (setMenuOpen(false), setPlayersOpen(true))} />
+          <MenuItem icon={<ListX size={18} />} label={`Fix hole count (${holes.length} holes)`} onClick={() => (setMenuOpen(false), setHoleCountInput(String(holes.length)), setHolesOpen(true))} />
           <MenuItem icon={<Flag size={18} />} label="Finish round" onClick={() => (setMenuOpen(false), setFinishOpen(true))} />
           <MenuItem icon={<Trash2 size={18} />} label="Delete round" danger onClick={() => (setMenuOpen(false), confirm("Delete this round for everyone on the card?") && remove())} />
         </div>
@@ -399,6 +407,73 @@ export function ScorecardRoute() {
         <Button variant="ghost" full className="mt-2" onClick={() => setFinishOpen(false)}>
           Keep scoring
         </Button>
+      </Sheet>
+
+      <Sheet open={confirmMark !== null} onClose={() => setConfirmMark(null)} title={`Replace the ${confirmMark ?? ""} for hole ${holeNumber}?`}>
+        <p className="text-sm text-ink-2">This hole already has a {confirmMark} position, shared with other players. Replace it with where you are standing now?</p>
+        <div className="mt-4 flex gap-2">
+          <Button className="flex-1" onClick={() => setConfirmMark(null)}>
+            Keep it
+          </Button>
+          <Button
+            variant="primary"
+            className="flex-1"
+            onClick={() => {
+              const what = confirmMark!;
+              setConfirmMark(null);
+              void markHere(what, true);
+            }}
+          >
+            Replace
+          </Button>
+        </div>
+      </Sheet>
+
+      <Sheet open={holesOpen} onClose={() => setHolesOpen(false)} title="Fix this course's holes">
+        <p className="text-sm text-ink-2">Course data is often wrong about hole counts. Changes here apply to the course for everyone and to this round.</p>
+        <div className="mt-4 rounded-card bg-surface-2 p-3">
+          <div className="text-sm font-semibold">Remove hole {holeNumber}</div>
+          <p className="mt-1 text-xs text-ink-3">Later holes move up one number.</p>
+          <Button
+            variant="danger"
+            size="sm"
+            className="mt-2"
+            disabled={holes.length <= 1}
+            onClick={async () => {
+              if (!course) return;
+              await removeHole(course.id, holeNumber);
+              await publishCourseNow(course.id);
+              setHolesOpen(false);
+              setIdx((i) => Math.min(i, Math.max(0, order.length - 2)));
+              notify(`Hole ${holeNumber} removed`);
+            }}
+          >
+            <Trash2 size={14} /> Remove hole {holeNumber}
+          </Button>
+        </div>
+        <form
+          className="mt-3 rounded-card bg-surface-2 p-3"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!course) return;
+            const n = Number(holeCountInput);
+            if (!Number.isFinite(n) || n < 1 || n > 36) return;
+            await setHoleCount(course.id, n);
+            await publishCourseNow(course.id);
+            setHolesOpen(false);
+            setIdx((i) => Math.min(i, Math.max(0, n - 1)));
+            notify(`Course set to ${n} holes`);
+          }}
+        >
+          <div className="text-sm font-semibold">Total holes on this course</div>
+          <p className="mt-1 text-xs text-ink-3">Extra holes come off the end; missing ones are added as par 3.</p>
+          <div className="mt-2 flex gap-2">
+            <Field name="holeCount" type="number" inputMode="numeric" min={1} max={36} value={holeCountInput} onChange={(e) => setHoleCountInput(e.target.value)} className="h-11 w-24" />
+            <Button type="submit" variant="brand" className="h-11">
+              Set
+            </Button>
+          </div>
+        </form>
       </Sheet>
 
       <Sheet open={!!trackerFor && !!trackerScore} onClose={() => setTrackerFor(null)} title={`${trackerPlayer?.name ?? ""} · hole ${holeNumber}`} tall>
