@@ -44,6 +44,23 @@ The Worker is named `medisc` in `wrangler.jsonc`. After the first deploy the app
 
 For git-based deploys, connect the repository under Workers & Pages > Create > Connect to Git. The Worker name in the dashboard must match `name` in `wrangler.jsonc`. Build command `bun run build`, deploy command `bunx wrangler deploy`.
 
+## Shared course layouts (D1)
+
+Pars and tee/basket positions are shared between everyone who uses the app. They live in a Cloudflare D1 database bound as `DB` in `wrangler.jsonc`. There are no accounts: it works like a wiki, last write wins per hole, and every change is kept in `hole_history`.
+
+One-time setup:
+
+```bash
+bunx wrangler d1 create medisc                 # or create it in the dashboard under Storage & Databases
+# paste the database_id into wrangler.jsonc
+bunx wrangler d1 migrations apply medisc --local    # for bun run dev
+bunx wrangler d1 migrations apply medisc --remote   # production
+```
+
+Without the binding the app still works; layouts just stay on the device.
+
+While playing, the scorecard has "Tee here" and "Basket here" buttons that save your GPS position for the current hole and publish it. The course editor does the same by tapping the map.
+
 ## Optional: Google Places for better coverage
 
 The two free sources miss some courses (Blair Mill Park in Stallings, NC, for example). Adding a Google Places key fills those gaps with Google Maps' listings. Text Search sits on the Pro SKU, which includes 5,000 free calls a month; the Worker caches each area for 30 days, so a personal app stays well inside that.
