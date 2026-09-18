@@ -327,6 +327,25 @@ interface CommunityCourse {
   updatedAt: number;
 }
 
+const SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS courses (key TEXT PRIMARY KEY, name TEXT NOT NULL, lat REAL NOT NULL, lon REAL NOT NULL, hole_count INTEGER NOT NULL, par INTEGER, city TEXT, region TEXT, source TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS courses_lat_lon ON courses (lat, lon)`,
+  `CREATE TABLE IF NOT EXISTS holes (course_key TEXT NOT NULL, number INTEGER NOT NULL, par INTEGER NOT NULL, distance_m INTEGER, tee_lat REAL, tee_lon REAL, basket_lat REAL, basket_lon REAL, updated_at INTEGER NOT NULL, PRIMARY KEY (course_key, number))`,
+  `CREATE TABLE IF NOT EXISTS hole_history (id INTEGER PRIMARY KEY AUTOINCREMENT, course_key TEXT NOT NULL, number INTEGER NOT NULL, payload TEXT NOT NULL, updated_at INTEGER NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS hole_history_course ON hole_history (course_key, updated_at)`,
+];
+let schemaReady: Promise<void> | null = null;
+/** Idempotent, runs once per isolate. Lets the Worker deploy from git without a separate migration step. */
+function ensureSchema(db: D1Database): Promise<void> {
+  if (!schemaReady) {
+    schemaReady = db.batch(SCHEMA.map((sql) => db.prepare(sql))).then(() => undefined).catch((err) => {
+      schemaReady = null;
+      throw err;
+    });
+  }
+  return schemaReady;
+}
+
 const KEY_RE = /^[a-zA-Z0-9_:.-]{3,120}$/;
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 
@@ -359,6 +378,7 @@ function rowToHole(r: Record<string, unknown>): CommunityHole {
 app.get("/api/community/courses", async (c) => {
   const db = c.env.DB;
   if (!db) return c.json({ enabled: false, courses: [] });
+  await ensureSchema(db);
   const lat = Number(c.req.query("lat"));
   const lon = Number(c.req.query("lon"));
   const radius = Math.min(Number(c.req.query("radius") ?? 25_000), 250_000);
@@ -380,6 +400,7 @@ app.get("/api/community/courses", async (c) => {
 app.get("/api/community/courses/:key", async (c) => {
   const db = c.env.DB;
   if (!db) return c.json({ enabled: false });
+  await ensureSchema(db);
   const key = c.req.param("key");
   if (!KEY_RE.test(key)) return c.json({ error: "bad key" }, 400);
   const course = await db.prepare("SELECT * FROM courses WHERE key = ?").bind(key).first<Record<string, unknown>>();
@@ -390,6 +411,7 @@ app.get("/api/community/courses/:key", async (c) => {
 app.put("/api/community/courses/:key", async (c) => {
   const db = c.env.DB;
   if (!db) return c.json({ enabled: false }, 503);
+  await ensureSchema(db);
   const key = c.req.param("key");
   if (!KEY_RE.test(key)) return c.json({ error: "bad key" }, 400);
   let body: { course?: Partial<CommunityCourse>; holes?: CommunityHole[] };

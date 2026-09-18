@@ -8,7 +8,7 @@
     {
       "binding": "DB",
       "database_name": "medisc",
-      "database_id": "REPLACE_WITH_D1_ID",
+      "database_id": "381f7b57-09d6-43c2-bb5c-67a854aeb431",
       "migrations_dir": "migrations"
     }
   ],
