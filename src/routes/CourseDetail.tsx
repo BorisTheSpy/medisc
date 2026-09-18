@@ -43,9 +43,14 @@ export function CourseDetailRoute() {
     if (!course) return false;
     try {
       const shared = await fetchCommunityHoles(course);
-      if (!shared || shared.length === 0) return false;
+      if (!shared) return false;
+      if (shared.name && shared.name !== course.name && !course.tags?.__renamed) {
+        await db.courses.update(course.id, { name: shared.name, updatedAt: Date.now() });
+        await db.rounds.where("courseId").equals(course.id).modify({ courseName: shared.name });
+      }
+      if (shared.holes.length === 0) return false;
       const local = await db.holes.where("courseId").equals(course.id).toArray();
-      const { merged, changed } = mergeHoles(local, shared);
+      const { merged, changed } = mergeHoles(local, shared.holes);
       if (changed) await saveHoles(course.id, merged);
       return true;
     } catch {

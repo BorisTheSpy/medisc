@@ -382,7 +382,21 @@ app.get("/api/community/courses", async (c) => {
   const lat = Number(c.req.query("lat"));
   const lon = Number(c.req.query("lon"));
   const radius = Math.min(Number(c.req.query("radius") ?? 25_000), 250_000);
-  if (!isNum(lat) || !isNum(lon)) return c.json({ error: "lat and lon are required" }, 400);
+  const q = (c.req.query("q") ?? "").trim().toLowerCase().slice(0, 80);
+  const hasOrigin = isNum(lat) && isNum(lon);
+  if (q) {
+    // Name search across everything players have named. Nearest first when an origin is known.
+    const words = q.split(/\s+/).filter(Boolean);
+    const where = words.map(() => "LOWER(name) LIKE ?").join(" AND ");
+    const { results } = await db
+      .prepare(`SELECT * FROM courses WHERE ${where} LIMIT 60`)
+      .bind(...words.map((w) => `%${w}%`))
+      .all<Record<string, unknown>>();
+    const list = results.map(rowToCourse).map((x) => ({ ...x, distanceM: hasOrigin ? haversineM(lat, lon, x.lat, x.lon) : undefined }));
+    if (hasOrigin) list.sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0));
+    return c.json({ enabled: true, courses: list });
+  }
+  if (!hasOrigin) return c.json({ error: "lat and lon, or q, are required" }, 400);
   const dLat = radius / 111_320;
   const dLon = radius / (111_320 * Math.max(Math.cos((lat * Math.PI) / 180), 0.01));
   const { results } = await db

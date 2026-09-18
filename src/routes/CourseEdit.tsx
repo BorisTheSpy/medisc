@@ -190,7 +190,9 @@ function EditHoles({ courseId }: { courseId: string }) {
 
   async function saveName() {
     if (name !== null && name.trim() && course) {
-      await db.courses.update(courseId, { name: name.trim(), updatedAt: Date.now() });
+      await db.courses.update(courseId, { name: name.trim(), tags: { ...(course.tags ?? {}), __renamed: "1" }, updatedAt: Date.now() });
+      await db.rounds.where("courseId").equals(courseId).modify({ courseName: name.trim() });
+      publishCourse(courseId, 0);
     }
     setName(null);
   }
@@ -209,9 +211,12 @@ function EditHoles({ courseId }: { courseId: string }) {
       <div className="px-4">
         <div className="mb-3 flex items-center gap-2">
           {name === null ? (
-            <button className="text-sm font-semibold text-birdie" onClick={() => setName(course.name)}>
-              Rename course
-            </button>
+            <>
+              <button className="text-sm font-semibold text-birdie" onClick={() => setName(course.name)}>
+                Rename course
+              </button>
+              <span className="text-xs text-ink-3">Renames are shared with everyone.</span>
+            </>
           ) : (
             <>
               <Field name="cname" value={name} onChange={(e) => setName(e.target.value)} className="h-10 flex-1" autoFocus />

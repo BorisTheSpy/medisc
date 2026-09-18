@@ -3,7 +3,7 @@ import type { Course, LatLon } from "@/domain/types";
 import { nearbyQuery, nameQuery, courseHolesQuery, parseNearbyCourses, parseCourseHoles, mergeCourseLists, type OverpassResponse, type NearbyCourse } from "@/domain/osm";
 import { fetchUsCourses, searchUsCoursesByName } from "./discgolfapi";
 import { fetchPlacesCourses, searchPlacesByName } from "./places";
-import { fetchCommunityCourses } from "./community";
+import { fetchCommunityCourses, searchCommunityCourses } from "./community";
 
 const DIRECT_ENDPOINTS = [
   "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
@@ -140,12 +140,14 @@ export async function fetchNearbyCourses(
  * within 125 miles of the origin are merged in when they arrive via `onUpdate`.
  */
 export async function searchCoursesByName(text: string, origin: LatLon | null, onUpdate: (courses: NearbyCourse[]) => void, signal?: AbortSignal): Promise<void> {
-  const [dir, gp] = await Promise.all([
+  const [community, dir, gp] = await Promise.all([
+    searchCommunityCourses(text, origin, signal).catch(() => [] as NearbyCourse[]),
     searchUsCoursesByName(text, origin, signal).catch(() => [] as NearbyCourse[]),
     searchPlacesByName(text, origin, signal).catch(() => [] as NearbyCourse[]),
   ]);
   if (signal?.aborted) return;
-  const directory = mergeCourseLists(dir, gp);
+  // Player-given names win over directory and Google names for the same course.
+  const directory = mergeCourseLists(community, mergeCourseLists(dir, gp));
   onUpdate(directory);
   if (!origin) return;
   try {

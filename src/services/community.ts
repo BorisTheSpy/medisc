@@ -30,12 +30,21 @@ export function courseKey(course: Course): string {
   return course.id;
 }
 
-export async function fetchCommunityHoles(course: Course, signal?: AbortSignal): Promise<Hole[] | null> {
+export interface SharedCourse {
+  name: string;
+  holes: Hole[];
+}
+
+export async function fetchCommunityHoles(course: Course, signal?: AbortSignal): Promise<SharedCourse | null> {
   const res = await fetch(`/api/community/courses/${encodeURIComponent(courseKey(course))}`, { signal });
   if (!res.ok) return null;
-  const json = (await res.json()) as { enabled: boolean; holes?: CommunityHole[] };
+  const json = (await res.json()) as { enabled: boolean; course?: CommunityCourseRow | null; holes?: CommunityHole[] };
   if (!json.enabled || !json.holes) return null;
-  return json.holes.map((h) => ({
+  return { name: json.course?.name ?? course.name, holes: toHoles(course, json.holes) };
+}
+
+function toHoles(course: Course, holes: CommunityHole[]): Hole[] {
+  return holes.map((h) => ({
     id: `${course.id}-${h.number}`,
     courseId: course.id,
     number: h.number,
@@ -101,7 +110,21 @@ export function publishCourse(courseId: string, delayMs = 1500): void {
 
 /** Courses other players have added or mapped, as nearby candidates. */
 export async function fetchCommunityCourses(center: LatLon, radiusM: number, signal?: AbortSignal): Promise<NearbyCourse[]> {
-  const res = await fetch(`/api/community/courses?lat=${center.lat.toFixed(5)}&lon=${center.lon.toFixed(5)}&radius=${Math.round(radiusM)}`, { signal });
+  return communityRequest(`/api/community/courses?lat=${center.lat.toFixed(5)}&lon=${center.lon.toFixed(5)}&radius=${Math.round(radiusM)}`, signal);
+}
+
+/** Name search over everything players have named, so a renamed course is found by its real name. */
+export async function searchCommunityCourses(q: string, center: LatLon | null, signal?: AbortSignal): Promise<NearbyCourse[]> {
+  const params = new URLSearchParams({ q });
+  if (center) {
+    params.set("lat", center.lat.toFixed(5));
+    params.set("lon", center.lon.toFixed(5));
+  }
+  return communityRequest(`/api/community/courses?${params.toString()}`, signal);
+}
+
+async function communityRequest(url: string, signal?: AbortSignal): Promise<NearbyCourse[]> {
+  const res = await fetch(url, { signal });
   if (!res.ok) return [];
   const json = (await res.json()) as { enabled: boolean; courses: CommunityCourseRow[] };
   if (!json.enabled) return [];
