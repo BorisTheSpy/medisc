@@ -274,6 +274,7 @@ export function StatsRoute() {
                       <span className={cx("font-bold", h.losses > h.wins ? "text-triple" : "text-ink-2")}>{h.losses}</span>
                     </div>
                   </div>
+                </div>
               );
             })}
           </div>
