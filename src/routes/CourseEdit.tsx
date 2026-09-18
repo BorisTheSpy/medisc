@@ -10,6 +10,7 @@ import { formatHoleDistance, haversineM, type Units } from "@/domain/geo";
 import type { Hole, LatLon } from "@/domain/types";
 import { Button, Field, PageHeader, Section, Spinner, cx } from "@/components/ui";
 import { CourseMap } from "@/map/CourseMap";
+import { publishCourse } from "@/services/community";
 
 export function CourseEditRoute() {
   const { id } = useParams();
@@ -46,6 +47,7 @@ function NewCourse() {
     if (!name.trim() || !pos) return;
     setBusy(true);
     const course = await createCustomCourse({ name, lat: pos.lat, lon: pos.lon, holeCount, defaultPar, city: params.get("city") || undefined });
+    publishCourse(course.id, 0);
     nav(`/courses/${course.id}/edit`, { replace: true });
   }
 
@@ -138,6 +140,7 @@ function EditHoles({ courseId }: { courseId: string }) {
       const tags = { ...(course?.tags ?? {}) };
       delete tags.__needsLocation;
       await db.courses.update(courseId, { lat: p.lat, lon: p.lon, tags, updatedAt: Date.now() });
+      publishCourse(courseId);
       setPlacing("tee");
       return;
     }
@@ -148,6 +151,7 @@ function EditHoles({ courseId }: { courseId: string }) {
       next.path = [next.tee, next.basket];
     }
     await updateHole(next);
+    publishCourse(courseId);
     // Advance: tee → basket → next hole tee.
     if (placing === "tee") setPlacing("basket");
     else {
@@ -158,17 +162,20 @@ function EditHoles({ courseId }: { courseId: string }) {
 
   async function setPar(h: Hole, par: number) {
     await updateHole({ ...h, par: Math.max(1, Math.min(9, par)) });
+    publishCourse(courseId);
   }
 
   async function setLength(h: Hole, raw: string) {
     const v = Number(raw);
     if (!Number.isFinite(v)) return;
     await updateHole({ ...h, distanceM: units === "ft" ? Math.round(v * 0.3048) : Math.round(v) });
+    publishCourse(courseId);
   }
 
   async function addHole() {
     const n = holes.length + 1;
     await updateHole({ id: `${courseId}-${n}`, courseId, number: n, par: 3, updatedAt: Date.now() });
+    publishCourse(courseId);
     setSelected(n);
   }
 
@@ -177,6 +184,7 @@ function EditHoles({ courseId }: { courseId: string }) {
     const rest = holes.slice(0, -1);
     await saveHoles(courseId, rest, false);
     await db.courses.update(courseId, { tags: { ...(course?.tags ?? {}), __edited: "1" } });
+    publishCourse(courseId);
     setSelected(Math.min(selected, rest.length));
   }
 
@@ -309,7 +317,7 @@ function EditHoles({ courseId }: { courseId: string }) {
             <Trash2 size={16} /> Remove last
           </Button>
         </div>
-        <p className="mt-3 mb-4 text-xs text-ink-3">Edits stay on this device and are kept even when the map data refreshes.</p>
+        <p className="mt-3 mb-4 text-xs text-ink-3">Pars and pin positions you set here are shared with every Medisc player who opens this course.</p>
       </Section>
     </div>
   );

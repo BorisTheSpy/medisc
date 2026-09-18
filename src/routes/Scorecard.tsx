@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { ChevronLeft, ChevronRight, Map as MapIcon, MoreHorizontal, Minus, Plus, Flag, Trash2, UserPlus, UserMinus, Undo2, Target, Crosshair } from "lucide-react";
 import { useCourse, useHoles, usePlayers, useRound, useRoundScores, useSetting } from "@/db/hooks";
-import { addPlayerToRound, adjustStrokes, createPlayer, deleteRound, finishRound, removePlayerFromRound, setHolePar, setSetting, setThrows } from "@/db/repo";
+import { addPlayerToRound, adjustStrokes, createPlayer, deleteRound, finishRound, removePlayerFromRound, setHolePar, setSetting, setThrows, updateHole } from "@/db/repo";
+import { publishCourse } from "@/services/community";
 import { useGeolocation } from "@/services/useGeolocation";
 import { formatHoleDistance, haversineM, type Units } from "@/domain/geo";
 import { formatToPar, roundTotals, scoreLabel, isHoledOut } from "@/domain/scoring";
 import type { HoleScore, Player, Zone } from "@/domain/types";
-import { Avatar, Button, Field, IconButton, Sheet, Spinner, cx } from "@/components/ui";
+import { Avatar, Button, Field, IconButton, Sheet, Spinner, Toast, cx } from "@/components/ui";
 import { CourseMap } from "@/map/CourseMap";
 
 const ZONES: { zone: Zone; label: string; hint: string }[] = [
@@ -18,6 +19,10 @@ const ZONES: { zone: Zone; label: string; hint: string }[] = [
   { zone: "parked", label: "Parked", hint: "Inside 10 ft, a tap-in" },
   { zone: "ob", label: "OB", hint: "Out of bounds, +1 penalty" },
 ];
+
+function formatAccuracyFt(m: number): number {
+  return m * 3.28084;
+}
 
 function holeKey(roundId: string) {
   return `medisc.hole.${roundId}`;
@@ -52,6 +57,37 @@ export function ScorecardRoute() {
   const [finishOpen, setFinishOpen] = useState(false);
   const [trackerFor, setTrackerFor] = useState<string | null>(null);
   const [guestName, setGuestName] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<number | null>(null);
+  function notify(msg: string) {
+    setToast(msg);
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(null), 2600);
+  }
+
+  /** Save the phone's current position as this hole's tee or basket, then share it. */
+  async function markHere(what: "tee" | "basket") {
+    if (!round || !course) return;
+    const pos = geo.position;
+    if (!pos) {
+      geo.locate();
+      notify("Waiting for a GPS fix. Try again in a moment.");
+      return;
+    }
+    if (pos.accuracy > 25) {
+      notify(`GPS accuracy is ±${Math.round(formatAccuracyFt(pos.accuracy))} ft. Stand still for a few seconds and tap again.`);
+      return;
+    }
+    const existing = hole ?? { id: `${course.id}-${holeNumber}`, courseId: course.id, number: holeNumber, par, updatedAt: Date.now() };
+    const next = { ...existing, [what]: { lat: pos.lat, lon: pos.lon }, par: existing.par || par };
+    if (next.tee && next.basket) {
+      next.distanceM = Math.round(haversineM(next.tee, next.basket));
+      next.path = [next.tee, next.basket];
+    }
+    await updateHole(next);
+    publishCourse(course.id);
+    notify(`${what === "tee" ? "Tee" : "Basket"} saved for hole ${holeNumber} (±${Math.round(formatAccuracyFt(pos.accuracy))} ft). Shared with everyone.`);
+  }
 
   const order = useMemo(() => {
     if (!round) return [];
@@ -168,6 +204,23 @@ export function ScorecardRoute() {
               <div className={cx("display numeric text-[34px]", distanceToBasket === null && "text-brand-ink/40")}>{distanceToBasket !== null ? formatHoleDistance(distanceToBasket, units) : "–"}</div>
             </div>
           </div>
+        </div>
+        <div className="flex items-center gap-2 px-4 pb-2">
+          <button
+            onClick={() => markHere("tee")}
+            className={cx("flex h-8 items-center gap-1 rounded-full px-3 text-xs font-semibold", hole?.tee ? "bg-brand-2 text-brand-ink" : "bg-accent text-accent-ink")}
+            aria-label={hole?.tee ? "Re-mark tee at my position" : "Mark tee at my position"}
+          >
+            <Crosshair size={12} /> {hole?.tee ? "Tee set" : "Tee here"}
+          </button>
+          <button
+            onClick={() => markHere("basket")}
+            className={cx("flex h-8 items-center gap-1 rounded-full px-3 text-xs font-semibold", hole?.basket ? "bg-brand-2 text-brand-ink" : "bg-accent text-accent-ink")}
+            aria-label={hole?.basket ? "Re-mark basket at my position" : "Mark basket at my position"}
+          >
+            <Crosshair size={12} /> {hole?.basket ? "Basket set" : "Basket here"}
+          </button>
+          <span className="ml-auto text-[11px] text-brand-ink/60">{geo.position ? `GPS ±${Math.round(formatAccuracyFt(geo.position.accuracy))} ft` : "No GPS yet"}</span>
         </div>
         <div className="flex gap-1.5 overflow-x-auto px-4 pb-3 [scrollbar-width:none]">
           {order.map((n, i) => (
@@ -351,6 +404,7 @@ export function ScorecardRoute() {
       <Sheet open={!!trackerFor && !!trackerScore} onClose={() => setTrackerFor(null)} title={`${trackerPlayer?.name ?? ""} · hole ${holeNumber}`} tall>
         {trackerScore && <ThrowTracker score={trackerScore} par={par} onDone={() => setTrackerFor(null)} />}
       </Sheet>
+      <Toast message={toast} />
     </div>
   );
 }

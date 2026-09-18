@@ -21,7 +21,7 @@ export interface LatLon {
 
 export interface Course extends Timestamps {
   id: string;
-  source: "osm" | "custom" | "dga" | "places";
+  source: "osm" | "custom" | "dga" | "places" | "community";
   dgaId?: string;
   placeId?: string;
   region?: string;

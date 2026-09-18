@@ -2,6 +2,7 @@ import { db } from "./db";
 import { createPlayer, upsertCourse, uuid } from "./repo";
 import { parseUdiscCsv, type UdiscExport, type UdiscLayout } from "@/domain/udisc";
 import { searchCoursesByName } from "@/services/overpass";
+import { publishCourse } from "@/services/community";
 import type { Course, Hole, HoleScore, LatLon, Player, Round } from "@/domain/types";
 import type { NearbyCourse } from "@/domain/osm";
 
@@ -89,6 +90,7 @@ async function resolveCourse(layout: UdiscLayout, isExtraLayout: boolean, origin
       updatedAt: now,
     });
   });
+  publishCourse(course.id, 0);
   return course;
 }
 

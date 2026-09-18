@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-type Env = { ASSETS: Fetcher; GOOGLE_PLACES_KEY?: string };
+type Env = { ASSETS: Fetcher; GOOGLE_PLACES_KEY?: string; DB?: D1Database };
 
 const ENDPOINTS = [
   "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
@@ -298,6 +298,150 @@ app.get("/api/courses/places", async (c) => {
   } catch (err) {
     return c.json({ enabled: true, error: err instanceof Error ? err.message : "Places unavailable", courses: [] }, 502);
   }
+});
+
+// ---------------------------------------------------------------------------------------------
+// Community layouts: shared tee/basket positions and pars, stored in D1. No accounts: it works like
+// a wiki. Last write wins per hole and every change is kept in hole_history so mistakes can be undone.
+// ---------------------------------------------------------------------------------------------
+
+interface CommunityHole {
+  number: number;
+  par: number;
+  distanceM?: number | null;
+  tee?: { lat: number; lon: number } | null;
+  basket?: { lat: number; lon: number } | null;
+  updatedAt: number;
+}
+
+interface CommunityCourse {
+  key: string;
+  name: string;
+  lat: number;
+  lon: number;
+  holeCount: number;
+  par?: number | null;
+  city?: string | null;
+  region?: string | null;
+  source: string;
+  updatedAt: number;
+}
+
+const KEY_RE = /^[a-zA-Z0-9_:.-]{3,120}$/;
+const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+
+function rowToCourse(r: Record<string, unknown>): CommunityCourse {
+  return {
+    key: String(r.key),
+    name: String(r.name),
+    lat: Number(r.lat),
+    lon: Number(r.lon),
+    holeCount: Number(r.hole_count),
+    par: r.par === null ? null : Number(r.par),
+    city: (r.city as string | null) ?? null,
+    region: (r.region as string | null) ?? null,
+    source: String(r.source),
+    updatedAt: Number(r.updated_at),
+  };
+}
+
+function rowToHole(r: Record<string, unknown>): CommunityHole {
+  return {
+    number: Number(r.number),
+    par: Number(r.par),
+    distanceM: r.distance_m === null ? null : Number(r.distance_m),
+    tee: r.tee_lat === null || r.tee_lon === null ? null : { lat: Number(r.tee_lat), lon: Number(r.tee_lon) },
+    basket: r.basket_lat === null || r.basket_lon === null ? null : { lat: Number(r.basket_lat), lon: Number(r.basket_lon) },
+    updatedAt: Number(r.updated_at),
+  };
+}
+
+app.get("/api/community/courses", async (c) => {
+  const db = c.env.DB;
+  if (!db) return c.json({ enabled: false, courses: [] });
+  const lat = Number(c.req.query("lat"));
+  const lon = Number(c.req.query("lon"));
+  const radius = Math.min(Number(c.req.query("radius") ?? 25_000), 250_000);
+  if (!isNum(lat) || !isNum(lon)) return c.json({ error: "lat and lon are required" }, 400);
+  const dLat = radius / 111_320;
+  const dLon = radius / (111_320 * Math.max(Math.cos((lat * Math.PI) / 180), 0.01));
+  const { results } = await db
+    .prepare("SELECT * FROM courses WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? LIMIT 400")
+    .bind(lat - dLat, lat + dLat, lon - dLon, lon + dLon)
+    .all<Record<string, unknown>>();
+  const list = results
+    .map(rowToCourse)
+    .map((x) => ({ ...x, distanceM: haversineM(lat, lon, x.lat, x.lon) }))
+    .filter((x) => x.distanceM <= radius)
+    .sort((a, b) => a.distanceM - b.distanceM);
+  return c.json({ enabled: true, courses: list });
+});
+
+app.get("/api/community/courses/:key", async (c) => {
+  const db = c.env.DB;
+  if (!db) return c.json({ enabled: false });
+  const key = c.req.param("key");
+  if (!KEY_RE.test(key)) return c.json({ error: "bad key" }, 400);
+  const course = await db.prepare("SELECT * FROM courses WHERE key = ?").bind(key).first<Record<string, unknown>>();
+  const { results } = await db.prepare("SELECT * FROM holes WHERE course_key = ? ORDER BY number").bind(key).all<Record<string, unknown>>();
+  return c.json({ enabled: true, course: course ? rowToCourse(course) : null, holes: results.map(rowToHole) }, 200, { "Cache-Control": "no-store" });
+});
+
+app.put("/api/community/courses/:key", async (c) => {
+  const db = c.env.DB;
+  if (!db) return c.json({ enabled: false }, 503);
+  const key = c.req.param("key");
+  if (!KEY_RE.test(key)) return c.json({ error: "bad key" }, 400);
+  let body: { course?: Partial<CommunityCourse>; holes?: CommunityHole[] };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Body must be JSON" }, 400);
+  }
+  const course = body.course;
+  const holes = Array.isArray(body.holes) ? body.holes : [];
+  if (!course || typeof course.name !== "string" || !course.name.trim() || !isNum(course.lat) || !isNum(course.lon)) {
+    return c.json({ error: "course needs name, lat and lon" }, 400);
+  }
+  if (holes.length > 40) return c.json({ error: "too many holes" }, 400);
+  const now = Date.now();
+  const name = course.name.trim().slice(0, 120);
+  const holeCount = Math.max(holes.length, isNum(course.holeCount) ? Math.round(course.holeCount) : 0, 1);
+  const par = holes.length ? holes.reduce((a, h) => a + (isNum(h.par) ? h.par : 3), 0) : isNum(course.par) ? course.par : null;
+
+  const statements: D1PreparedStatement[] = [
+    db
+      .prepare(
+        `INSERT INTO courses (key, name, lat, lon, hole_count, par, city, region, source, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)
+         ON CONFLICT(key) DO UPDATE SET name = excluded.name, lat = excluded.lat, lon = excluded.lon, hole_count = excluded.hole_count,
+           par = excluded.par, city = COALESCE(excluded.city, courses.city), region = COALESCE(excluded.region, courses.region), updated_at = excluded.updated_at`,
+      )
+      .bind(key, name, course.lat, course.lon, holeCount, par, course.city ?? null, course.region ?? null, String(course.source ?? "custom").slice(0, 20), now),
+  ];
+  for (const h of holes) {
+    if (!isNum(h.number) || h.number < 1 || h.number > 40) continue;
+    const hPar = isNum(h.par) ? Math.max(1, Math.min(9, Math.round(h.par))) : 3;
+    const teeOk = h.tee && isNum(h.tee.lat) && isNum(h.tee.lon);
+    const basketOk = h.basket && isNum(h.basket.lat) && isNum(h.basket.lon);
+    const updatedAt = isNum(h.updatedAt) ? Math.min(h.updatedAt, now) : now;
+    // Last write wins: only overwrite if this edit is newer than what is stored.
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO holes (course_key, number, par, distance_m, tee_lat, tee_lon, basket_lat, basket_lon, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+           ON CONFLICT(course_key, number) DO UPDATE SET par = excluded.par, distance_m = excluded.distance_m,
+             tee_lat = excluded.tee_lat, tee_lon = excluded.tee_lon, basket_lat = excluded.basket_lat, basket_lon = excluded.basket_lon, updated_at = excluded.updated_at
+           WHERE excluded.updated_at >= holes.updated_at`,
+        )
+        .bind(key, Math.round(h.number), hPar, isNum(h.distanceM) ? Math.round(h.distanceM) : null, teeOk ? h.tee!.lat : null, teeOk ? h.tee!.lon : null, basketOk ? h.basket!.lat : null, basketOk ? h.basket!.lon : null, updatedAt),
+    );
+    statements.push(db.prepare("INSERT INTO hole_history (course_key, number, payload, updated_at) VALUES (?1, ?2, ?3, ?4)").bind(key, Math.round(h.number), JSON.stringify(h).slice(0, 2000), updatedAt));
+  }
+  await db.batch(statements);
+  const { results } = await db.prepare("SELECT * FROM holes WHERE course_key = ? ORDER BY number").bind(key).all<Record<string, unknown>>();
+  return c.json({ enabled: true, holes: results.map(rowToHole) });
 });
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));

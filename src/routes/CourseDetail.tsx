@@ -3,7 +3,9 @@ import { useNavigate, useParams } from "react-router";
 import { Play, Pencil, RefreshCw, ExternalLink } from "lucide-react";
 import { useAllScores, useCourse, useHoles, useMe, useRounds, useSetting } from "@/db/hooks";
 import { fetchCourseHoles } from "@/services/overpass";
+import { fetchCommunityHoles, mergeHoles } from "@/services/community";
 import { saveHoles, setSetting } from "@/db/repo";
+import { db } from "@/db/db";
 import { useGeolocation } from "@/services/useGeolocation";
 import { formatHoleDistance, type Units } from "@/domain/geo";
 import { holeStatsForCourse, perCourse } from "@/domain/stats";
@@ -36,19 +38,39 @@ export function CourseDetailRoute() {
     return Array.from({ length: course?.holeCount || 18 }, (_, i) => ({ id: `${course!.id}-${i + 1}`, courseId: course!.id, number: i + 1, par: 3, updatedAt: now }));
   }
 
+  /** Pull shared holes (other players' pins and pars) and merge them into the local copy. */
+  async function syncShared(): Promise<boolean> {
+    if (!course) return false;
+    try {
+      const shared = await fetchCommunityHoles(course);
+      if (!shared || shared.length === 0) return false;
+      const local = await db.holes.where("courseId").equals(course.id).toArray();
+      const { merged, changed } = mergeHoles(local, shared);
+      if (changed) await saveHoles(course.id, merged);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async function refetch(force = false) {
     if (!course || course.source === "custom") return;
     setFetching(true);
     setFetchError(null);
-    // Make the course playable right away; a mapped layout replaces these if OpenStreetMap has one.
+    // Make the course playable right away; shared or mapped layouts replace these when found.
     if (holes.length === 0) await saveHoles(course.id, defaultHoles(), false);
     try {
+      const hadShared = await syncShared();
+      if (course.source === "community") return; // community courses only come from the shared database
       const found = await fetchCourseHoles(course);
       if (found.length > 0) {
-        await saveHoles(course.id, found);
-      } else {
+        const local = await db.holes.where("courseId").equals(course.id).toArray();
+        // Keep any shared pins; OSM fills in only holes nobody has mapped yet.
+        const { merged } = mergeHoles(found, local.filter((h) => h.tee || h.basket));
+        await saveHoles(course.id, merged);
+      } else if (!hadShared) {
         if (force || !course.fetchedHolesAt) await saveHoles(course.id, holes.length > 0 ? holes : defaultHoles());
-        setFetchError("OpenStreetMap has no hole details for this course yet. Pars default to 3. Edit holes to set the real layout.");
+        setFetchError("No hole details for this course yet. Pars default to 3. Edit holes to set the layout, or mark tees and baskets while you play, and it will be shared with everyone.");
       }
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : "Could not load hole details");
@@ -58,12 +80,12 @@ export function CourseDetailRoute() {
   }
 
   useEffect(() => {
-    if (needsFetch && !attempted.current) {
-      attempted.current = true;
-      refetch();
-    }
+    if (!course || attempted.current) return;
+    attempted.current = true;
+    if (needsFetch) refetch();
+    else syncShared();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needsFetch]);
+  }, [course?.id, needsFetch]);
 
   const finished = useMemo(() => rounds.filter((r) => r.finishedAt && r.courseId === id), [rounds, id]);
   const mine = useMemo(() => (me && id ? perCourse(finished, scores, me.id).find((c) => c.courseId === id) : undefined), [finished, scores, me, id]);
@@ -218,6 +240,7 @@ export function CourseDetailRoute() {
             )}
             {course.source === "dga" && <span>Course data supplied by DiscGolfAPI.</span>}
             {course.source === "places" && <span>Powered by Google.</span>}
+            {course.source === "community" && <span>Added by a Medisc player.</span>}
           </div>
         </Section>
       )}

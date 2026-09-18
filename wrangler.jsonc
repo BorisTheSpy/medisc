@@ -4,6 +4,14 @@
   "main": "./worker/index.ts",
   "compatibility_date": "2026-09-16",
   "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "medisc",
+      "database_id": "REPLACE_WITH_D1_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
   "assets": {
     "not_found_handling": "single-page-application",
     "binding": "ASSETS",
