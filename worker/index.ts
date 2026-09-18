@@ -467,8 +467,11 @@ app.put("/api/community/courses/:key", async (c) => {
         .prepare(
           `INSERT INTO holes (course_key, number, par, distance_m, tee_lat, tee_lon, basket_lat, basket_lon, updated_at)
            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-           ON CONFLICT(course_key, number) DO UPDATE SET par = excluded.par, distance_m = excluded.distance_m,
-             tee_lat = excluded.tee_lat, tee_lon = excluded.tee_lon, basket_lat = excluded.basket_lat, basket_lon = excluded.basket_lon, updated_at = excluded.updated_at
+           ON CONFLICT(course_key, number) DO UPDATE SET par = excluded.par,
+             distance_m = COALESCE(excluded.distance_m, holes.distance_m),
+             tee_lat = COALESCE(excluded.tee_lat, holes.tee_lat), tee_lon = COALESCE(excluded.tee_lon, holes.tee_lon),
+             basket_lat = COALESCE(excluded.basket_lat, holes.basket_lat), basket_lon = COALESCE(excluded.basket_lon, holes.basket_lon),
+             updated_at = excluded.updated_at
            WHERE excluded.updated_at >= holes.updated_at`,
         )
         .bind(key, Math.round(h.number), hPar, isNum(h.distanceM) ? Math.round(h.distanceM) : null, teeOk ? h.tee!.lat : null, teeOk ? h.tee!.lon : null, basketOk ? h.basket!.lat : null, basketOk ? h.basket!.lon : null, updatedAt),
@@ -478,6 +481,47 @@ app.put("/api/community/courses/:key", async (c) => {
   await db.batch(statements);
   const { results } = await db.prepare("SELECT * FROM holes WHERE course_key = ? ORDER BY number").bind(key).all<Record<string, unknown>>();
   return c.json({ enabled: true, holes: results.map(rowToHole) });
+});
+
+/** Restore pins from history: for each hole, re-apply the most recent recorded tee and basket. */
+app.post("/api/community/courses/:key/restore", async (c) => {
+  const db = c.env.DB;
+  if (!db) return c.json({ enabled: false }, 503);
+  await ensureSchema(db);
+  const key = c.req.param("key");
+  if (!KEY_RE.test(key)) return c.json({ error: "bad key" }, 400);
+  const { results } = await db.prepare("SELECT number, payload, updated_at FROM hole_history WHERE course_key = ? ORDER BY updated_at DESC").bind(key).all<{ number: number; payload: string; updated_at: number }>();
+  const tee = new Map<number, { lat: number; lon: number }>();
+  const basket = new Map<number, { lat: number; lon: number }>();
+  for (const r of results) {
+    let h: CommunityHole;
+    try {
+      h = JSON.parse(r.payload) as CommunityHole;
+    } catch {
+      continue;
+    }
+    if (h.tee && isNum(h.tee.lat) && isNum(h.tee.lon) && !tee.has(r.number)) tee.set(r.number, h.tee);
+    if (h.basket && isNum(h.basket.lat) && isNum(h.basket.lon) && !basket.has(r.number)) basket.set(r.number, h.basket);
+  }
+  const now = Date.now();
+  const numbers = new Set([...tee.keys(), ...basket.keys()]);
+  const statements: D1PreparedStatement[] = [];
+  for (const n of numbers) {
+    const t = tee.get(n) ?? null;
+    const b = basket.get(n) ?? null;
+    const dist = t && b ? Math.round(haversineM(t.lat, t.lon, b.lat, b.lon)) : null;
+    statements.push(
+      db
+        .prepare(
+          `UPDATE holes SET tee_lat = COALESCE(?2, tee_lat), tee_lon = COALESCE(?3, tee_lon), basket_lat = COALESCE(?4, basket_lat), basket_lon = COALESCE(?5, basket_lon),
+             distance_m = COALESCE(?6, distance_m), updated_at = ?7 WHERE course_key = ?1 AND number = ?8`,
+        )
+        .bind(key, t?.lat ?? null, t?.lon ?? null, b?.lat ?? null, b?.lon ?? null, dist, now, n),
+    );
+  }
+  if (statements.length) await db.batch(statements);
+  const holes = await db.prepare("SELECT * FROM holes WHERE course_key = ? ORDER BY number").bind(key).all<Record<string, unknown>>();
+  return c.json({ enabled: true, restored: numbers.size, holes: holes.results.map(rowToHole) });
 });
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));

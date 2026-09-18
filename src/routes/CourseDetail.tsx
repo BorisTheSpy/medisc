@@ -62,20 +62,23 @@ export function CourseDetailRoute() {
     if (!course || course.source === "custom") return;
     setFetching(true);
     setFetchError(null);
-    // Make the course playable right away; shared or mapped layouts replace these when found.
-    if (holes.length === 0) await saveHoles(course.id, defaultHoles(), false);
+    // Make the course playable right away, but only if it truly has no holes yet (read storage, not React state).
+    const stored = await db.holes.where("courseId").equals(course.id).count();
+    if (stored === 0) await saveHoles(course.id, defaultHoles(), false);
     try {
       const hadShared = await syncShared();
       if (course.source === "community") return; // community courses only come from the shared database
       const found = await fetchCourseHoles(course);
+      const local = await db.holes.where("courseId").equals(course.id).toArray();
       if (found.length > 0) {
-        const local = await db.holes.where("courseId").equals(course.id).toArray();
-        // Keep any shared pins; OSM fills in only holes nobody has mapped yet.
+        // Keep local pins and pars edited by players; OSM fills in only what nobody has mapped.
         const { merged } = mergeHoles(found, local.filter((h) => h.tee || h.basket));
         await saveHoles(course.id, merged);
       } else if (!hadShared) {
-        if (force || !course.fetchedHolesAt) await saveHoles(course.id, holes.length > 0 ? holes : defaultHoles());
-        setFetchError("No hole details for this course yet. Pars default to 3. Edit holes to set the layout, or mark tees and baskets while you play, and it will be shared with everyone.");
+        if (!course.fetchedHolesAt) await db.courses.update(course.id, { fetchedHolesAt: Date.now() });
+        if (!local.some((h) => h.tee || h.basket)) {
+          setFetchError("No hole details for this course yet. Pars default to 3. Edit holes to set the layout, or mark tees and baskets while you play, and it will be shared with everyone.");
+        }
       }
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : "Could not load hole details");
