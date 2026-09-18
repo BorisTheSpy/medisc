@@ -141,10 +141,8 @@ export function CoursesRoute() {
       if (c.source !== "custom" || !area) continue;
       if (haversineM(area, c) <= area.radiusM && !list.some((x) => x.id === c.id)) list.push({ ...c });
     }
-    const q = query.trim().toLowerCase();
-    const filtered = q ? list.filter((c) => c.name.toLowerCase().includes(q) || c.city?.toLowerCase().includes(q)) : list;
-    return withDistance(filtered).sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0));
-  }, [courses, savedCourses, area, query, withDistance]);
+    return withDistance(list).sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0));
+  }, [courses, savedCourses, area, withDistance]);
 
   async function open(course: NearbyCourse) {
     const saved = await upsertCourse({ ...course, distanceM: undefined } as NearbyCourse);
@@ -231,6 +229,26 @@ export function CoursesRoute() {
     geo.locate();
   }
 
+  // Typing searches everywhere (directory, Google, OpenStreetMap) after a short pause, nearest first.
+  const searchTimer = useRef<number | null>(null);
+  const runCourseSearchRef = useRef(runCourseSearch);
+  runCourseSearchRef.current = runCourseSearch;
+  useEffect(() => {
+    if (searchTimer.current) window.clearTimeout(searchTimer.current);
+    const text = query.trim();
+    if (text.length < 3) {
+      if (text.length === 0) {
+        setSearchResults(null);
+        setPlaceFallback(null);
+      }
+      return;
+    }
+    searchTimer.current = window.setTimeout(() => runCourseSearchRef.current(), 600);
+    return () => {
+      if (searchTimer.current) window.clearTimeout(searchTimer.current);
+    };
+  }, [query]);
+
   const showingSearch = searchResults !== null;
   const areaLabel = !area ? (geo.loading ? "Finding your location…" : "Location needed") : area.label ? `Near ${area.label}` : area.fromDevice ? "Near you" : "In the map area";
   const tooWide = !!area && area.radiusM >= MAX_RADIUS_M;
@@ -311,17 +329,18 @@ export function CoursesRoute() {
         )}
       </div>
 
-      {showingSearch ? (
+      {showingSearch || searchBusy ? (
         <div className="mt-3 px-4">
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-ink-2">
-              {searchResults.length} {searchResults.length === 1 ? "match" : "matches"} across the US
+            <h2 className="flex items-center gap-2 text-sm font-bold text-ink-2">
+              {searchBusy && <Spinner className="h-3.5 w-3.5" />}
+              {searchBusy ? "Searching…" : `${searchResults!.length} ${searchResults!.length === 1 ? "match" : "matches"} across the US`}
             </h2>
             <button className="text-sm font-semibold text-birdie" onClick={clearSearch}>
               Back to map area
             </button>
           </div>
-          {searchResults.length === 0 ? (
+          {searchBusy && !searchResults ? null : searchResults!.length === 0 ? (
             <EmptyState
               title="No course by that name"
               body={placeFallback ? `The directories do not list a course here yet, but the place exists: ${placeFallback.label.split(",").slice(0, 3).join(", ")}. Add it and set the holes yourself.` : "Try a shorter name or the park it is in. If it is brand new, add it yourself."}
@@ -339,8 +358,8 @@ export function CoursesRoute() {
             />
           ) : (
             <>
-              <CourseList courses={searchResults} units={units} onOpen={open} />
-              {searchResults.some((c) => c.source === "places") && <p className="mt-3 text-center text-[11px] text-ink-3">Powered by Google.</p>}
+              <CourseList courses={searchResults!} units={units} onOpen={open} />
+              {searchResults!.some((c) => c.source === "places") && <p className="mt-3 text-center text-[11px] text-ink-3">Powered by Google.</p>}
             </>
           )}
         </div>
@@ -437,18 +456,12 @@ export function CoursesRoute() {
           )}
           {courses && merged.length === 0 && !loading && (
             <EmptyState
-              title={query.trim() ? `Nothing here matches “${query.trim()}”` : "No courses in this area"}
-              body={query.trim() ? "Tap Find course to search the whole country, or clear the filter." : "Open the map and drag to another area, or add the course yourself."}
+              title="No courses in this area"
+              body="Open the map and drag to another area, type a course name, or add the course yourself."
               action={
-                query.trim() ? (
-                  <Button variant="brand" onClick={runCourseSearch}>
-                    <Search size={18} /> Find course
-                  </Button>
-                ) : (
-                  <Button variant="brand" onClick={() => setView("map")}>
-                    <MapPin size={18} /> Open the map
-                  </Button>
-                )
+                <Button variant="brand" onClick={() => setView("map")}>
+                  <MapPin size={18} /> Open the map
+                </Button>
               }
             />
           )}
