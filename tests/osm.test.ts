@@ -3,7 +3,7 @@ import nearbyJson from "./fixtures/nearby-helsinki.json";
 import holesJson from "./fixtures/holes-paloheina.json";
 const nearby = nearbyJson as unknown as OverpassResponse;
 const holes = holesJson as unknown as OverpassResponse;
-import { parseNearbyCourses, parseCourseHoles, nearbyQuery, courseHolesQuery, parseHoleCount, parseLengthM, type OverpassResponse } from "../src/domain/osm";
+import { parseNearbyCourses, parseCourseHoles, nearbyQuery, courseHolesQuery, parseHoleCount, parseLengthM, mergeCourseLists, validatePlaces, dropHidden, type OverpassResponse, type NearbyCourse } from "../src/domain/osm";
 import type { Course } from "../src/domain/types";
 
 describe("osm nearby", () => {
@@ -100,5 +100,77 @@ describe("osm helpers", () => {
     expect(courseHolesQuery(node)).toContain("around:");
     const way: Course = { ...rel, osmType: "way", osmId: 40254405 };
     expect(courseHolesQuery(way)).toContain("way(40254405)");
+  });
+});
+
+const mk = (id: string, name: string, lat: number, lon: number, source: NearbyCourse["source"]): NearbyCourse =>
+  ({ id, name, lat, lon, source, distanceM: 0, updatedAt: 0, tags: {} }) as NearbyCourse;
+
+describe("mergeCourseLists keeps distinct courses in one park", () => {
+  it("never merges two directory records into each other", () => {
+    const a = mk("d1", "Nevin Park Disc Golf Course", 35.30, -80.85, "dga");
+    const b = mk("d2", "Nevin Daydream", 35.304, -80.85, "dga");
+    expect(mergeCourseLists([], [a, b]).map((c) => c.id)).toEqual(["d1", "d2"]);
+  });
+  it("lets one OSM entry absorb only one directory record", () => {
+    const osm = mk("o1", "Reedy Creek Disc Golf Course", 35.30, -80.75, "osm");
+    const short = mk("d1", "Reedy Creek Disc Golf Course (Holes 1–9)", 35.302, -80.75, "dga");
+    const long = mk("d2", "Reedy Creek Park", 35.308, -80.75, "dga");
+    const out = mergeCourseLists([osm], [short, long]);
+    expect(out.map((c) => c.id).sort()).toEqual(["d2", "o1"]);
+  });
+  it("is stable when the same lists are merged again", () => {
+    const dir = mk("d1", "Bradford Park", 35.5, -80.6, "dga");
+    const gp = mk("gp-1", "Bradford Park Disc Golf Course", 35.5001, -80.6, "places");
+    const once = mergeCourseLists([dir], [gp]);
+    const twice = mergeCourseLists(once, [dir, gp]);
+    expect(twice.map((c) => c.id)).toEqual(["d1"]);
+  });
+  it("keeps the base record's hole count when it absorbs a copy", () => {
+    const shared = { ...mk("udisc-1", "Robert L. Smith: Ravine", 35.258, -80.943, "community"), holeCount: 20 };
+    const dir = { ...mk("d1", "Robert L. Smith Park", 35.2581, -80.943, "dga"), holeCount: 18 };
+    const out = mergeCourseLists([shared], [dir]);
+    expect(out.length).toBe(1);
+    expect(out[0]!.holeCount).toBe(20);
+  });
+  it("keeps a 9 and an 18 apart even when their names match", () => {
+    const shared = { ...mk("udisc-1", "Reedy Creek DGC", 35.30, -80.75, "community"), holeCount: 18 };
+    const osm = { ...mk("o1", "Reedy Creek Disc Golf Course (Holes 1–9)", 35.302, -80.75, "osm"), holeCount: 9 };
+    expect(mergeCourseLists([shared], [osm]).map((c) => c.id).sort()).toEqual(["o1", "udisc-1"]);
+  });
+  it("tolerates a hole count off by one or two", () => {
+    const shared = { ...mk("udisc-1", "Kilborne TPC", 35.22, -80.77, "community"), holeCount: 19 };
+    const dir = { ...mk("d1", "Kilborne TPC", 35.2201, -80.77, "dga"), holeCount: 18 };
+    expect(mergeCourseLists([shared], [dir]).map((c) => c.id)).toEqual(["udisc-1"]);
+  });
+  it("still folds a Places copy into the directory record", () => {
+    const dir = mk("d1", "Bradford Park", 35.5, -80.6, "dga");
+    const gp = mk("gp-1", "Bradford Park Disc Golf Course", 35.5001, -80.6, "places");
+    expect(mergeCourseLists([], mergeCourseLists([dir], [gp])).map((c) => c.id)).toEqual(["d1"]);
+  });
+});
+
+describe("validatePlaces", () => {
+  const dir = mk("d1", "Elon Park - Eager Beaver", 35.02, -80.845, "dga");
+  it("keeps a Google result whose name says disc golf", () => {
+    const gp = mk("gp-1", "Blair Mill Disc Golf Course", 35.4, -80.7, "places");
+    expect(validatePlaces([gp]).length).toBe(1);
+  });
+  it("drops a bare park with no course from another source nearby", () => {
+    const gp = mk("gp-2", "Biddleville Park", 35.2429, -80.8502, "places");
+    expect(validatePlaces([dir, gp]).map((c) => c.id)).toEqual(["d1"]);
+  });
+  it("keeps a bare park anchored by a same-named course within 1 km", () => {
+    const gp = mk("gp-3", "Elon Homes Park", 35.0201, -80.8413, "places");
+    expect(validatePlaces([dir, gp]).map((c) => c.id)).toEqual(["d1", "gp-3"]);
+  });
+});
+
+describe("dropHidden", () => {
+  it("removes reported places by key or by name near the report", () => {
+    const a = mk("gp-x", "Biddleville Park", 35.2429, -80.8502, "places");
+    const b = mk("osm-1", "Biddleville Park", 35.243, -80.8503, "osm");
+    const c = mk("d1", "Chantilly Park", 35.21, -80.80, "dga");
+    expect(dropHidden([a, b, c], [{ key: "gp-x", name: "Biddleville Park", lat: 35.2429, lon: -80.8502 }]).map((x) => x.id)).toEqual(["d1"]);
   });
 });

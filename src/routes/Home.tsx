@@ -1,14 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { Play, Settings, ChevronRight, Flame } from "lucide-react";
+import { Play, Settings, ChevronRight } from "lucide-react";
 import { useAllScores, useLiveRound, useMe, usePlayers, useRounds } from "@/db/hooks";
 import { overview, weeklyStreak } from "@/domain/stats";
-import { roundTotals } from "@/domain/scoring";
-import { formatToPar } from "@/domain/scoring";
+import { roundTotals, formatToPar } from "@/domain/scoring";
 import { formatRoundDate } from "@/lib/format";
-import { Button, Card, IconButton, Section, EmptyState } from "@/components/ui";
+import { Button, IconButton, Section, EmptyState, cx } from "@/components/ui";
 import { mergePlayerInto } from "@/db/repo";
-import { useState } from "react";
 import { Logo } from "@/components/Logo";
 import { RoundRow } from "@/components/RoundRow";
 
@@ -36,40 +34,42 @@ export function HomeRoute() {
   const stats = useMemo(() => (me ? overview(finished, scores, me.id) : null), [finished, scores, me]);
   const streak = useMemo(() => weeklyStreak(finished), [finished]);
   const liveTotals = useMemo(() => (live ? roundTotals(scores.filter((s) => s.roundId === live.id)) : null), [live, scores]);
+  const liveMine = live && me ? liveTotals?.get(me.id) : undefined;
   const hour = new Date().getHours();
-  const greeting = hour < 5 ? "Late night" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const greeting = hour < 5 ? "Late night" : hour < 12 ? "Morning" : hour < 18 ? "Afternoon" : "Evening";
+  const first = me?.name.split(" ")[0] ?? "";
 
   return (
     <div>
-      <header className="safe-top px-4 pt-4">
+      <header className="safe-top px-[22px] pt-[22px]">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-[11px]">
             <Logo size={30} />
-            <span className="text-lg font-extrabold tracking-tight">Medisc</span>
+            <span className="label text-ink">Medisc</span>
           </div>
           <IconButton label="Settings" onClick={() => nav("/settings")}>
             <Settings size={22} />
           </IconButton>
         </div>
-        <h1 className="display mt-6 text-[40px]">
-          {greeting}, {me?.name.split(" ")[0]}.
+        <h1 className="display mt-[33px] text-[46px] text-ink">
+          {greeting},
+          <br />
+          {first}.
         </h1>
-        {streak > 0 && (
-          <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-ink-2">
-            <Flame size={16} className="text-accent" />
-            {streak === 1 ? "1 week streak. Play this week to keep it." : `${streak} week streak. Keep it going.`}
-          </p>
-        )}
+        <p className="label mt-[11px] text-ink-3">
+          {streak > 0 ? `${streak} week streak` : "No streak yet"}
+          {stats && stats.rounds > 0 ? ` · ${stats.rounds} rounds` : ""}
+        </p>
       </header>
 
       {orphan && (
-        <div className="mt-6 px-4">
-          <div className="rounded-card bg-surface p-4 shadow-card">
-            <div className="font-semibold">
-              {orphan.count} {orphan.count === 1 ? "round lists" : "rounds list"} “{orphan.player.name}” but not you
+        <div className="mt-[22px] px-[22px]">
+          <div className="rounded-[14px] border border-lime bg-surface p-[22px]">
+            <div className="display text-[24px]">
+              {orphan.count} {orphan.count === 1 ? "round lists" : "rounds list"} “{orphan.player.name}”, not you
             </div>
-            <p className="mt-1 text-sm text-ink-2">If that's you under another name, claim those rounds and they'll count toward your stats.</p>
-            <div className="mt-3 flex gap-2">
+            <p className="mt-[11px] text-[14px] font-medium text-ink-2">If that's you under another name, claim those rounds and they count toward your stats.</p>
+            <div className="mt-[22px] flex gap-[11px]">
               <Button
                 variant="primary"
                 size="sm"
@@ -81,60 +81,64 @@ export function HomeRoute() {
                 Yes, that's me
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setDismissed(true)}>
-                No, someone else
+                Someone else
               </Button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="mt-6 px-4">
+      <div className="mt-[22px] px-[22px]">
         {live ? (
-          <Card className="overflow-hidden bg-brand text-brand-ink" onClick={() => nav(`/rounds/${live.id}/play`)}>
-            <div className="flex items-center justify-between p-4">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 text-xs font-semibold text-accent">
-                  <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-accent" /> Round in progress
-                </div>
-                <div className="mt-1 truncate text-lg font-bold">{live.courseName}</div>
-                <div className="mt-0.5 text-sm text-brand-ink/75">
-                  {live.playerIds
-                    .map((id) => {
-                      const p = players.find((x) => x.id === id);
-                      const t = liveTotals?.get(id);
-                      return `${p?.name.split(" ")[0] ?? "?"} ${t && t.holesScored ? formatToPar(t.toPar) : "–"}`;
-                    })
-                    .join(" · ")}
-                </div>
-              </div>
-              <ChevronRight className="shrink-0 text-accent" />
+          <button onClick={() => nav(`/rounds/${live.id}/play`)} className="block w-full rounded-[39px] bg-lime px-[22px] py-[22px] text-left text-on-lime active:bg-lime-2">
+            <div className="flex items-center justify-between">
+              <span className="label flex items-center gap-2">
+                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-on-lime" /> Live round
+              </span>
+              <ChevronRight size={20} />
             </div>
-          </Card>
+            <div className="display mt-[11px] truncate text-[30px]">{live.courseName}</div>
+            {live.layoutName && <div className="label mt-1 text-ink-3">{live.layoutName}</div>}
+            <div className="mt-[22px] flex items-end justify-between gap-[11px]">
+              <div className="flex flex-wrap gap-1.5">
+                {live.playerIds.map((id) => {
+                  const p = players.find((x) => x.id === id);
+                  const t = liveTotals?.get(id);
+                  return (
+                    <span key={id} className="label rounded-[39px] border border-on-lime/40 px-2.5 py-1.5">
+                      {p?.name.split(" ")[0] ?? "?"} {t && t.holesScored ? formatToPar(t.toPar) : "–"}
+                    </span>
+                  );
+                })}
+              </div>
+              <span className="display numeric text-[56px] leading-none">{liveMine && liveMine.holesScored ? formatToPar(liveMine.toPar) : "–"}</span>
+            </div>
+          </button>
         ) : (
           <Button variant="primary" size="lg" full onClick={() => nav("/play")}>
-            <Play size={20} fill="currentColor" /> Start a round
+            <Play size={18} fill="currentColor" /> Start a round
           </Button>
         )}
       </div>
 
       {stats && stats.rounds > 0 && (
-        <Section className="mt-6">
-          <div className="grid grid-cols-4 gap-2 rounded-card bg-surface p-3 shadow-card">
+        <div className="mt-[22px] px-[22px]">
+          <div className="grid grid-cols-4 divide-x divide-line rounded-[6px] bg-surface py-[11px]">
             <Quick label="Rounds" value={stats.rounds} />
             <Quick label="Courses" value={stats.coursesPlayed} />
-            <Quick label="Best" value={stats.bestToPar === null ? "–" : formatToPar(stats.bestToPar)} />
-            <Quick label="Birdie rate" value={`${Math.round(stats.birdieRate * 100)}%`} />
+            <Quick label="Best" value={stats.bestToPar === null ? "–" : formatToPar(stats.bestToPar)} good={stats.bestToPar !== null && stats.bestToPar < 0} />
+            <Quick label="Birdies" value={`${Math.round(stats.birdieRate * 100)}%`} />
           </div>
-        </Section>
+        </div>
       )}
 
       <Section
-        title="Recent rounds"
-        className="mt-8"
+        title={finished.length === 0 ? undefined : "Recent rounds"}
+        className="mt-[44px]"
         action={
           finished.length > 0 && (
-            <button className="text-sm font-semibold text-birdie" onClick={() => nav("/rounds")}>
-              See all
+            <button className="label text-lime" onClick={() => nav("/rounds")}>
+              All rounds
             </button>
           )
         }
@@ -142,15 +146,15 @@ export function HomeRoute() {
         {finished.length === 0 ? (
           <EmptyState
             title="No rounds yet"
-            body="Your first scorecard lands here. Find a course nearby and tap Start a round."
+            body="Your first scorecard lands here. Find a course nearby and start a round."
             action={
-              <Button variant="brand" onClick={() => nav("/courses")}>
+              <Button variant="primary" onClick={() => nav("/courses")}>
                 Find courses near me
               </Button>
             }
           />
         ) : (
-          <div className="overflow-hidden rounded-card bg-surface shadow-card">
+          <div className="overflow-hidden rounded-[14px] bg-surface">
             {finished.slice(0, 5).map((r) => (
               <RoundRow key={r.id} round={r} scores={scores} players={players} meId={me?.id} onClick={() => nav(`/rounds/${r.id}`)} subtitle={formatRoundDate(r.startedAt)} />
             ))}
@@ -161,11 +165,11 @@ export function HomeRoute() {
   );
 }
 
-function Quick({ label, value }: { label: string; value: string | number }) {
+function Quick({ label, value, good }: { label: string; value: string | number; good?: boolean }) {
   return (
-    <div className="text-center">
-      <div className="display numeric text-[24px]">{value}</div>
-      <div className="mt-0.5 text-[11px] font-medium text-ink-3">{label}</div>
+    <div className="px-[11px] text-center">
+      <div className={cx("display numeric text-[26px]", good && "text-lime")}>{value}</div>
+      <div className="label mt-2 text-ink-3">{label}</div>
     </div>
   );
 }

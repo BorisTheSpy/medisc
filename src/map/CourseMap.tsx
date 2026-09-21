@@ -9,7 +9,7 @@ import { cx } from "@/components/ui";
 
 setWorkerUrl(workerUrl);
 
-export const BASEMAP_STYLE = "https://tiles.openfreemap.org/styles/positron";
+export const BASEMAP_STYLE = "https://tiles.openfreemap.org/styles/dark";
 const SATELLITE_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 const SATELLITE_ATTRIBUTION = "Imagery © Esri, Maxar, Earthstar Geographics";
 
@@ -72,8 +72,8 @@ function holesGeoJSON(holes: Hole[]): FeatureCollection {
   };
 }
 
-const ACTIVE = "#E9A83A";
-const LINE = "#1B3F7A";
+const ACTIVE = "#d2ff00";
+const LINE = "#f4f4ed";
 
 function lineColor(active?: number) {
   return ["case", ["==", ["get", "number"], active ?? -1], ACTIVE, LINE] as unknown as string;
@@ -94,7 +94,7 @@ function ensureHoleLayers(map: MLMap, holes: Hole[], active?: number) {
       type: "line",
       source: "holes",
       layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": "#FFFFFF", "line-width": lineWidth(active, true), "line-opacity": 0.9 },
+      paint: { "line-color": "#282c20", "line-width": lineWidth(active, true), "line-opacity": 0.85 },
     });
     map.addLayer({
       id: "holes-line",
@@ -280,12 +280,12 @@ export function CourseMap({ center, holes = [], activeHole, user, satellite = fa
             aria-pressed={satellite}
             aria-label="Toggle satellite imagery"
             onClick={() => onSatelliteChange(!satellite)}
-            className={cx("grid h-10 w-10 place-items-center rounded-full shadow-card", satellite ? "bg-accent text-accent-ink" : "bg-surface text-ink")}
+            className={cx("grid h-10 w-10 place-items-center rounded-full border border-line-strong", satellite ? "bg-lime text-on-lime" : "bg-surface text-ink")}
           >
             <Layers size={18} />
           </button>
         )}
-        <button aria-label="Center on me" onClick={recenter} className="grid h-10 w-10 place-items-center rounded-full bg-surface text-ink shadow-card">
+        <button aria-label="Center on me" onClick={recenter} className="grid h-10 w-10 place-items-center rounded-full border border-line-strong bg-surface text-ink">
           <Crosshair size={18} />
         </button>
       </div>

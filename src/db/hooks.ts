@@ -1,6 +1,7 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "./db";
-import type { Course, Hole, HoleScore, Player, Round } from "@/domain/types";
+import type { Course, Hole, HoleScore, Layout, Player, Round } from "@/domain/types";
+import { MAIN_LAYOUT } from "@/domain/layouts";
 
 export function useMe(): Player | undefined | null {
   return useLiveQuery(async () => (await db.players.filter((p) => p.isMe && !p.deletedAt).first()) ?? null, []);
@@ -41,14 +42,19 @@ export function useCourses(): Course[] {
   return useLiveQuery(() => db.courses.filter((c) => !c.deletedAt).toArray(), []) ?? [];
 }
 
-export function useHoles(courseId: string | undefined): Hole[] {
+export function useHoles(courseId: string | undefined, layoutId: string = MAIN_LAYOUT): Hole[] {
   return (
     useLiveQuery(async () => {
       if (!courseId) return [];
-      const holes = await db.holes.where("courseId").equals(courseId).toArray();
+      const holes = await db.holes.where("[courseId+layoutId]").equals([courseId, layoutId]).toArray();
       return holes.sort((a, b) => a.number - b.number);
-    }, [courseId]) ?? []
+    }, [courseId, layoutId]) ?? []
   );
+}
+
+/** Stored layouts for a course. Use layoutsFor() to add the implicit main layout. */
+export function useLayouts(courseId: string | undefined): Layout[] {
+  return useLiveQuery(async () => (courseId ? db.layouts.where("courseId").equals(courseId).toArray() : []), [courseId]) ?? [];
 }
 
 export function useSetting<T>(key: string, fallback: T): T {

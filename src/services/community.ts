@@ -1,6 +1,7 @@
 import { db } from "@/db/db";
-import type { Course, Hole, LatLon } from "@/domain/types";
+import type { Course, Hole, LatLon, Layout } from "@/domain/types";
 import type { NearbyCourse } from "@/domain/osm";
+import { MAIN_LAYOUT, holeId } from "@/domain/layouts";
 
 interface CommunityHole {
   number: number;
@@ -9,6 +10,20 @@ interface CommunityHole {
   tee?: LatLon | null;
   basket?: LatLon | null;
   updatedAt: number;
+}
+
+interface CommunityLayoutRow {
+  layoutId: string;
+  name: string;
+  holeCount: number;
+  par?: number | null;
+  distanceM?: number | null;
+  difficulty?: string | null;
+  technicality?: string | null;
+  lengthBin?: string | null;
+  playCount?: number | null;
+  updatedAt: number;
+  holes?: CommunityHole[];
 }
 
 interface CommunityCourseRow {
@@ -23,6 +38,8 @@ interface CommunityCourseRow {
   source: string;
   updatedAt: number;
   distanceM?: number;
+  difficulty?: string | null;
+  rating?: number | null;
 }
 
 /** Shared course key. Ids from OSM, the directory and Google are already deterministic; custom ids are UUIDs. */
@@ -30,23 +47,46 @@ export function courseKey(course: Course): string {
   return course.id;
 }
 
+export interface SharedLayout extends Omit<Layout, "id" | "courseId"> {
+  holes: Hole[];
+}
+
 export interface SharedCourse {
   name: string;
+  /** Main layout holes. */
   holes: Hole[];
+  /** Every layout the course has, main included when the server knows about it. */
+  layouts: SharedLayout[];
+  difficulty?: string;
+  rating?: number;
 }
 
 export async function fetchCommunityHoles(course: Course, signal?: AbortSignal): Promise<SharedCourse | null> {
   const res = await fetch(`/api/community/courses/${encodeURIComponent(courseKey(course))}`, { signal });
   if (!res.ok) return null;
-  const json = (await res.json()) as { enabled: boolean; course?: CommunityCourseRow | null; holes?: CommunityHole[] };
+  const json = (await res.json()) as { enabled: boolean; course?: CommunityCourseRow | null; holes?: CommunityHole[]; layouts?: CommunityLayoutRow[] };
   if (!json.enabled || !json.holes) return null;
-  return { name: json.course?.name ?? course.name, holes: toHoles(course, json.holes) };
+  const layouts: SharedLayout[] = (json.layouts ?? []).map((l) => ({
+    layoutId: l.layoutId,
+    name: l.name,
+    holeCount: l.holeCount,
+    par: l.par ?? undefined,
+    distanceM: l.distanceM ?? undefined,
+    difficulty: l.difficulty ?? undefined,
+    technicality: l.technicality ?? undefined,
+    lengthBin: l.lengthBin ?? undefined,
+    playCount: l.playCount ?? undefined,
+    updatedAt: l.updatedAt,
+    holes: toHoles(course, l.layoutId === MAIN_LAYOUT ? json.holes! : (l.holes ?? []), l.layoutId),
+  }));
+  return { name: json.course?.name ?? course.name, holes: toHoles(course, json.holes, MAIN_LAYOUT), layouts, difficulty: json.course?.difficulty ?? undefined, rating: json.course?.rating ?? undefined };
 }
 
-function toHoles(course: Course, holes: CommunityHole[]): Hole[] {
+function toHoles(course: Course, holes: CommunityHole[], layoutId: string): Hole[] {
   return holes.map((h) => ({
-    id: `${course.id}-${h.number}`,
+    id: holeId(course.id, layoutId, h.number),
     courseId: course.id,
+    layoutId,
     number: h.number,
     par: h.par,
     distanceM: h.distanceM ?? undefined,
@@ -115,10 +155,32 @@ async function clearDirty(courseId: string): Promise<void> {
 export async function publishCourseNow(courseId: string): Promise<boolean> {
   const course = await db.courses.get(courseId);
   if (!course || course.tags?.__needsLocation) return false;
-  const holes = (await db.holes.where("courseId").equals(courseId).toArray()).sort((a, b) => a.number - b.number);
+  const allHoles = (await db.holes.where("courseId").equals(courseId).toArray()).sort((a, b) => a.number - b.number);
+  const holes = allHoles.filter((h) => (h.layoutId || MAIN_LAYOUT) === MAIN_LAYOUT);
+  // Only publish something a player actually contributed: a pin, an edited layout, a rename, or a course they created.
+  const hasSubstance = course.source === "custom" || !!course.tags?.__edited || !!course.tags?.__renamed || allHoles.some((h) => h.tee || h.basket);
+  if (!hasSubstance) {
+    await clearDirty(courseId);
+    return false;
+  }
+  const wire = (h: Hole) => ({ number: h.number, par: h.par, distanceM: h.distanceM ?? null, tee: h.tee ?? null, basket: h.basket ?? null, updatedAt: h.updatedAt });
+  const layoutRows = await db.layouts.where("courseId").equals(courseId).toArray();
   const body = {
-    course: { name: course.name, lat: course.lat, lon: course.lon, holeCount: holes.length || course.holeCount, par: course.par ?? null, city: course.city ?? null, region: course.region ?? null, source: course.source },
-    holes: holes.map((h) => ({ number: h.number, par: h.par, distanceM: h.distanceM ?? null, tee: h.tee ?? null, basket: h.basket ?? null, updatedAt: h.updatedAt })),
+    course: { name: course.name, lat: course.lat, lon: course.lon, holeCount: holes.length || course.holeCount, par: course.par ?? null, city: course.city ?? null, region: course.region ?? null, source: course.tags?.origin ?? course.source, difficulty: course.difficulty ?? null, rating: course.rating ?? null },
+    holes: holes.map(wire),
+    layouts: layoutRows.map((l) => ({
+      layoutId: l.layoutId,
+      name: l.name,
+      holeCount: l.holeCount,
+      par: l.par ?? null,
+      distanceM: l.distanceM ?? null,
+      difficulty: l.difficulty ?? null,
+      technicality: l.technicality ?? null,
+      lengthBin: l.lengthBin ?? null,
+      playCount: l.playCount ?? null,
+      updatedAt: l.updatedAt,
+      holes: l.layoutId === MAIN_LAYOUT ? [] : allHoles.filter((h) => h.layoutId === l.layoutId).map(wire),
+    })),
   };
   try {
     const res = await fetch(`/api/community/courses/${encodeURIComponent(courseKey(course))}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), keepalive: true });
@@ -174,9 +236,37 @@ export function installPublishRetries(): void {
   });
 }
 
-/** Courses other players have added or mapped, as nearby candidates. */
-export async function fetchCommunityCourses(center: LatLon, radiusM: number, signal?: AbortSignal): Promise<NearbyCourse[]> {
-  return communityRequest(`/api/community/courses?lat=${center.lat.toFixed(5)}&lon=${center.lon.toFixed(5)}&radius=${Math.round(radiusM)}`, signal);
+export interface HiddenCourse extends LatLon {
+  key: string;
+  name: string;
+}
+
+export interface CommunityNearby {
+  courses: NearbyCourse[];
+  hidden: HiddenCourse[];
+}
+
+/** Courses other players have added or mapped, plus places players have reported as not disc golf. */
+export async function fetchCommunityNearby(center: LatLon, radiusM: number, signal?: AbortSignal): Promise<CommunityNearby> {
+  const res = await fetch(`/api/community/courses?lat=${center.lat.toFixed(5)}&lon=${center.lon.toFixed(5)}&radius=${Math.round(radiusM)}`, { signal });
+  if (!res.ok) return { courses: [], hidden: [] };
+  const json = (await res.json()) as { enabled: boolean; courses: CommunityCourseRow[]; hidden?: HiddenCourse[] };
+  if (!json.enabled) return { courses: [], hidden: [] };
+  return { courses: rowsToCourses(json.courses), hidden: json.hidden ?? [] };
+}
+
+/** Report that a listed place has no disc golf course. Hides it for everyone. */
+export async function hideCourse(course: Course, reason = "no disc golf here"): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/community/courses/${encodeURIComponent(courseKey(course))}/hide`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: course.name, lat: course.lat, lon: course.lon, reason }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 /** Name search over everything players have named, so a renamed course is found by its real name. */
@@ -194,10 +284,18 @@ async function communityRequest(url: string, signal?: AbortSignal): Promise<Near
   if (!res.ok) return [];
   const json = (await res.json()) as { enabled: boolean; courses: CommunityCourseRow[] };
   if (!json.enabled) return [];
+  return rowsToCourses(json.courses);
+}
+
+function rowsToCourses(rows: CommunityCourseRow[]): NearbyCourse[] {
   const now = Date.now();
-  return json.courses.map((r) => ({
+  return rows.map((r) => ({
     id: r.key,
     source: "community",
+    // Where the shared record came from (udisc, dga, custom…), for attribution on the course page.
+    tags: { origin: r.source },
+    difficulty: r.difficulty ?? undefined,
+    rating: r.rating ?? undefined,
     name: r.name,
     lat: r.lat,
     lon: r.lon,

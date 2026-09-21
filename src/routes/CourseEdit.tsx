@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { LocateFixed, Trash2, Plus } from "lucide-react";
-import { useCourse, useHoles, useSetting } from "@/db/hooks";
+import { useCourse, useHoles, useLayouts, useSetting } from "@/db/hooks";
+import { MAIN_LAYOUT, holeId } from "@/domain/layouts";
 import { createCustomCourse, getSetting, saveHoles, setSetting, updateHole } from "@/db/repo";
 import { db } from "@/db/db";
 import { useGeolocation } from "@/services/useGeolocation";
@@ -117,8 +118,13 @@ function NewCourse() {
 
 function EditHoles({ courseId }: { courseId: string }) {
   const nav = useNavigate();
+  const [params] = useSearchParams();
+  const layoutId = params.get("layout") || MAIN_LAYOUT;
   const course = useCourse(courseId);
-  const holes = useHoles(courseId);
+  const layoutRows = useLayouts(courseId);
+  const layoutName = layoutId === MAIN_LAYOUT ? null : (layoutRows.find((l) => l.layoutId === layoutId)?.name ?? layoutId);
+  const holes = useHoles(courseId, layoutId);
+  const backTo = `/courses/${courseId}?layout=${encodeURIComponent(layoutId)}`;
   const units = useSetting<Units>("units", "ft");
   const satellite = useSetting<boolean>("satellite", false);
   const geo = useGeolocation(false);
@@ -174,7 +180,7 @@ function EditHoles({ courseId }: { courseId: string }) {
 
   async function addHole() {
     const n = holes.length + 1;
-    await updateHole({ id: `${courseId}-${n}`, courseId, number: n, par: 3, updatedAt: Date.now() });
+    await updateHole({ id: holeId(courseId, layoutId, n), courseId, layoutId, number: n, par: 3, updatedAt: Date.now() });
     publishCourse(courseId);
     setSelected(n);
   }
@@ -182,7 +188,7 @@ function EditHoles({ courseId }: { courseId: string }) {
   async function removeLast() {
     if (holes.length <= 1) return;
     const rest = holes.slice(0, -1);
-    await saveHoles(courseId, rest, false);
+    await saveHoles(courseId, rest, false, layoutId);
     await db.courses.update(courseId, { tags: { ...(course?.tags ?? {}), __edited: "1" } });
     publishCourse(courseId);
     setSelected(Math.min(selected, rest.length));
@@ -207,7 +213,7 @@ function EditHoles({ courseId }: { courseId: string }) {
 
   return (
     <div>
-      <PageHeader title="Edit holes" sub={course.name} back={() => nav(`/courses/${courseId}`, { replace: true })} right={<Button variant="brand" size="sm" onClick={() => nav(`/courses/${courseId}`, { replace: true })}>Done</Button>} />
+      <PageHeader title="Edit holes" sub={layoutName ? `${course.name} · ${layoutName}` : course.name} back={() => nav(backTo, { replace: true })} right={<Button variant="brand" size="sm" onClick={() => nav(backTo, { replace: true })}>Done</Button>} />
       <div className="px-4">
         <div className="mb-3 flex items-center gap-2">
           {name === null ? (

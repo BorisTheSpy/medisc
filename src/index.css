@@ -1,100 +1,66 @@
 @import "tailwindcss";
 @import "maplibre-gl/dist/maplibre-gl.css" layer(base);
 
-:root {
-  --bg: #f3f6fa;
-  --surface: #ffffff;
-  --surface-2: #e7edf5;
-  --surface-3: #d9e2ee;
-  --ink: #121c2b;
-  --ink-2: #4a5a72;
-  --ink-3: #7c8aa3;
-  --line: rgba(18, 28, 43, 0.1);
-  --line-strong: rgba(18, 28, 43, 0.22);
-  --brand: #1b3f7a;
-  --brand-2: #26518f;
-  --brand-ink: #f3f6fa;
-  --accent: #e9a83a;
-  --accent-2: #f2c063;
-  --accent-ink: #14201a;
-  --danger: #c4553b;
-  --danger-ink: #ffffff;
-  --ace: #2fa37e;
-  --eagle: #1f7a5c;
-  --birdie: #3a9d7c;
-  --birdie-soft: #d9efe6;
-  --bogey: #f6cfae;
-  --double: #ee9a61;
-  --triple: #d5612b;
-  --map-tee: #e9a83a;
-  --map-basket: #f3f6fa;
-  --shadow: 0 1px 2px rgba(18, 28, 43, 0.06), 0 8px 24px -12px rgba(18, 28, 43, 0.18);
-  color-scheme: light;
+/* Self-hosted so a first launch with no signal still gets the real faces. */
+@font-face {
+  font-family: "Young Serif";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/young-serif.woff2") format("woff2");
 }
 
-:root[data-theme="dark"] {
-  --bg: #0e1b2e;
-  --surface: #16243a;
-  --surface-2: #1f3050;
-  --surface-3: #2a3f63;
-  --ink: #edf2f9;
-  --ink-2: #b3c0d4;
-  --ink-3: #7f8fa8;
-  --line: rgba(237, 242, 249, 0.1);
-  --line-strong: rgba(237, 242, 249, 0.24);
-  --brand: #1f4a8c;
-  --brand-2: #2a5ca8;
-  --brand-ink: #f3f6fa;
-  --accent: #f0b44c;
-  --accent-2: #f6c96f;
-  --accent-ink: #14201a;
-  --danger: #e0755c;
-  --danger-ink: #14201a;
-  --ace: #3dbb92;
-  --eagle: #2f9c78;
-  --birdie: #55c49d;
-  --birdie-soft: #1d3d33;
-  --bogey: #8a5a3e;
-  --double: #b96a3b;
-  --triple: #d97a3a;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+@font-face {
+  font-family: "Mona Sans";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("/fonts/mona-sans.woff2") format("woff2");
+}
+
+/* Medisc visual system: charcoal field, dark olive panels, acid lime for everything live. */
+:root {
+  --bg: #3b3c38;
+  --bg-deep: #2f302c;
+  --surface: #282c20;
+  --surface-2: #3a3f2e;
+  --surface-3: #48503a;
+  --ink: #f4f4ed;
+  --ink-2: #cfd0c4;
+  --ink-3: #acaea0;
+  --line: rgba(210, 255, 0, 0.16);
+  --line-strong: rgba(244, 244, 237, 0.22);
+  --lime: #d2ff00;
+  --lime-2: #e4ff5c;
+  --on-lime: #282c20;
+  --brand: #282c20;
+  --brand-2: #323628;
+  --brand-ink: #f4f4ed;
+  --accent: #d2ff00;
+  --accent-2: #e4ff5c;
+  --accent-ink: #282c20;
+  --danger: #ff5b3a;
+  --danger-ink: #282c20;
+  --ace: #d2ff00;
+  --eagle: #d2ff00;
+  --birdie: #d2ff00;
+  --birdie-soft: rgba(210, 255, 0, 0.14);
+  --bogey: #f4f4ed;
+  --double: #f4f4ed;
+  --triple: #ff5b3a;
+  --radius-sm: 2px;
+  --radius-md: 6px;
+  --radius-lg: 14px;
+  --radius-xl: 39px;
+  --space: 11px;
   color-scheme: dark;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0e1b2e;
-    --surface: #16243a;
-    --surface-2: #1f3050;
-    --surface-3: #2a3f63;
-    --ink: #edf2f9;
-    --ink-2: #b3c0d4;
-    --ink-3: #7f8fa8;
-    --line: rgba(237, 242, 249, 0.1);
-    --line-strong: rgba(237, 242, 249, 0.24);
-    --brand: #1f4a8c;
-    --brand-2: #2a5ca8;
-    --brand-ink: #f3f6fa;
-    --accent: #f0b44c;
-    --accent-2: #f6c96f;
-    --accent-ink: #14201a;
-    --danger: #e0755c;
-    --danger-ink: #14201a;
-    --ace: #3dbb92;
-    --eagle: #2f9c78;
-    --birdie: #55c49d;
-    --birdie-soft: #1d3d33;
-    --bogey: #8a5a3e;
-    --double: #b96a3b;
-    --triple: #d97a3a;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
-    color-scheme: dark;
-  }
-}
-
 @theme inline {
-  --font-sans: "Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Mona Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Young Serif", Georgia, "Times New Roman", serif;
   --color-bg: var(--bg);
+  --color-bg-deep: var(--bg-deep);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-3);
@@ -103,6 +69,9 @@
   --color-ink-3: var(--ink-3);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
+  --color-lime: var(--lime);
+  --color-lime-2: var(--lime-2);
+  --color-on-lime: var(--on-lime);
   --color-brand: var(--brand);
   --color-brand-2: var(--brand-2);
   --color-brand-ink: var(--brand-ink);
@@ -119,8 +88,9 @@
   --color-double: var(--double);
   --color-triple: var(--triple);
   --radius-card: 14px;
-  --radius-sheet: 22px;
-  --shadow-card: var(--shadow);
+  --radius-sheet: 14px;
+  --radius-pill: 39px;
+  --shadow-card: none;
 }
 
 html,
@@ -134,18 +104,37 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-sans);
-  font-optical-sizing: auto;
-  font-variation-settings: "wdth" 100;
+  font-weight: 500;
+  font-size: 15px;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
 }
 
+::selection {
+  background: var(--lime);
+  color: var(--on-lime);
+}
+
+input,
+textarea {
+  caret-color: var(--lime);
+}
+
+/* Display voice: heavy serif, set tight like a race hub headline. */
 .display {
-  font-variation-settings: "wdth" 88;
-  font-weight: 800;
+  font-family: var(--font-display);
+  font-weight: 400;
   letter-spacing: -0.02em;
-  line-height: 0.95;
+  line-height: 0.85;
+}
+
+/* Small heavy labels: the system's 12px / 800 meta voice. */
+.label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1;
 }
 
 .numeric {
@@ -171,7 +160,7 @@ button,
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--lime);
   outline-offset: 2px;
 }
 
@@ -180,6 +169,36 @@ select,
 textarea {
   font: inherit;
   color: inherit;
+}
+
+/* Score strike: the number snaps in with a lime flash, no tween on the digit itself. */
+@keyframes strike {
+  0% {
+    color: var(--lime);
+  }
+  100% {
+    color: inherit;
+  }
+}
+
+.strike {
+  animation: strike 120ms steps(2, end) both;
+}
+
+/* Hole overlay: slides in like a timing screen once per hole change. */
+@keyframes overlay-in {
+  from {
+    transform: translateX(-12px);
+    opacity: 0.4;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.overlay-in {
+  animation: overlay-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -191,14 +210,26 @@ textarea {
   }
 }
 
+/* Scrollbars belong to the palette. */
+* {
+  scrollbar-color: var(--surface-3) transparent;
+  scrollbar-width: thin;
+}
+
 .maplibregl-ctrl-attrib {
   font-size: 10px;
+  background: rgba(40, 44, 32, 0.85) !important;
+  color: var(--ink-2) !important;
+}
+
+.maplibregl-ctrl-attrib a {
+  color: var(--ink) !important;
 }
 
 .maplibregl-popup-content {
   background: var(--surface);
   color: var(--ink);
-  border-radius: 10px;
+  border-radius: 6px;
   font-family: var(--font-sans);
 }
 
@@ -212,21 +243,37 @@ textarea {
   border-radius: 50%;
   display: grid;
   place-items: center;
+  font-family: var(--font-sans);
   font-weight: 800;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-  border: 2px solid #ffffff;
+  border: 2px solid #282c20;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
 }
 
 .hole-marker.tee {
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--lime);
+  color: var(--on-lime);
 }
 
 .hole-marker.basket {
-  background: #1b3f7a;
-  color: #f3f6fa;
+  background: #282c20;
+  color: var(--lime);
+  border-color: var(--lime);
+}
+
+.hole-marker.active {
+  transform: scale(1.25);
+  border-color: #f4f4ed;
+}
+
+.user-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--lime);
+  border: 3px solid #282c20;
+  box-shadow: 0 0 0 3px rgba(210, 255, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.5);
 }
 
 .course-pin {
@@ -234,21 +281,21 @@ textarea {
   height: 30px;
   border-radius: 50% 50% 50% 0;
   transform: rotate(-45deg);
-  background: #1b3f7a;
-  border: 2px solid #ffffff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  background: #282c20;
+  border: 2px solid var(--lime);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
   display: grid;
   place-items: center;
 }
 
 .course-pin.active {
-  background: #e9a83a;
+  background: var(--lime);
   transform: rotate(-45deg) scale(1.25);
   z-index: 2;
 }
 
 .course-pin.active::after {
-  background: #1b3f7a;
+  background: #282c20;
 }
 
 .course-pin::after {
@@ -256,19 +303,5 @@ textarea {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #e9a83a;
-}
-
-.hole-marker.active {
-  transform: scale(1.25);
-  border-color: var(--accent);
-}
-
-.user-dot {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #e9a83a;
-  border: 3px solid #fff;
-  box-shadow: 0 0 0 2px rgba(233, 168, 58, 0.4), 0 1px 4px rgba(0, 0, 0, 0.4);
+  background: var(--lime);
 }

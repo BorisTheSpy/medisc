@@ -58,7 +58,7 @@ export function RoundSummaryRoute() {
   const tie = ranked.length > 1 && totals.get(ranked[1].id)?.toPar === winnerTotal?.toPar && !!totals.get(ranked[1].id)?.holesScored;
 
   async function share() {
-    const lines = [`${round!.courseName} · ${formatRoundDate(round!.startedAt)}`];
+    const lines = [`${round!.courseName}${round!.layoutName ? ` (${round!.layoutName})` : ""} · ${formatRoundDate(round!.startedAt)}`];
     for (const p of ranked) {
       const t = totals.get(p.id);
       lines.push(`${p.name}: ${t && t.holesScored ? `${t.strokes} (${formatToPar(t.toPar)})` : "–"}`);
@@ -91,7 +91,7 @@ export function RoundSummaryRoute() {
     <div>
       <PageHeader
         title={round.name ?? round.courseName}
-        sub={`${round.name ? round.courseName + " · " : ""}${formatRoundDate(round.startedAt)}`}
+        sub={`${round.name ? round.courseName + " · " : ""}${round.layoutName ? round.layoutName + " · " : ""}${formatRoundDate(round.startedAt)}`}
         back={() => nav(-1)}
         right={
           <>

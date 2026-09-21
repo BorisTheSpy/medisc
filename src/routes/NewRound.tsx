@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { Check, Plus, Search, UserPlus } from "lucide-react";
-import { useCourses, useHoles, useMe, usePlayers } from "@/db/hooks";
+import { useCourses, useHoles, useLayouts, useMe, usePlayers } from "@/db/hooks";
+import { MAIN_LAYOUT, formatLengthBin, layoutsFor, pickLayout } from "@/domain/layouts";
 import { createPlayer, createRound, getSetting } from "@/db/repo";
 import { haversineM, formatTravelDistance, type Units } from "@/domain/geo";
 import type { Course, LatLon } from "@/domain/types";
@@ -17,7 +18,11 @@ export function NewRoundRoute() {
   const units = useSetting<Units>("units", "ft");
   const [courseId, setCourseId] = useState<string | null>(params.get("course"));
   const course = courses.find((c) => c.id === courseId) ?? null;
-  const holes = useHoles(course?.id);
+  const layoutRows = useLayouts(course?.id);
+  const layouts = useMemo(() => (course ? layoutsFor(course, layoutRows) : []), [course, layoutRows]);
+  const [wantedLayout, setWantedLayout] = useState<string>(params.get("layout") || MAIN_LAYOUT);
+  const layout = layouts.length ? pickLayout(layouts, wantedLayout) : null;
+  const holes = useHoles(course?.id, layout?.layoutId ?? MAIN_LAYOUT);
   const [selected, setSelected] = useState<string[]>([]);
   const [startingHole, setStartingHole] = useState(1);
   const [subset, setSubset] = useState<"all" | "front" | "back">("all");
@@ -74,7 +79,7 @@ export function NewRoundRoute() {
   async function start() {
     if (!course || holes.length === 0 || selected.length === 0) return;
     setBusy(true);
-    const round = await createRound({ course, holes, playerIds: selected, startingHole, holeNumbers, trackThrows });
+    const round = await createRound({ course, holes, playerIds: selected, startingHole, holeNumbers, trackThrows, layout: layout ? { layoutId: layout.layoutId, name: layout.name } : undefined });
     nav(`/rounds/${round.id}/play`, { replace: true });
   }
 
@@ -86,17 +91,36 @@ export function NewRoundRoute() {
 
       <Section title="Course">
         {course ? (
-          <div className="flex items-center gap-3 rounded-card bg-surface p-4 shadow-card">
-            <div className="min-w-0 flex-1">
-              <div className="truncate font-semibold">{course.name}</div>
-              <div className="text-xs text-ink-3">
-                {holes.length} holes{totalPar ? ` · par ${totalPar}` : ""}
-                {holes.length === 0 && " · open the course page first to load holes"}
+          <div>
+            <div className="flex items-center gap-3 rounded-card bg-surface p-4 shadow-card">
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-semibold">{course.name}</div>
+                <div className="text-xs text-ink-3">
+                  {layouts.length > 1 && layout ? `${layout.name} · ` : ""}
+                  {holes.length} holes{totalPar ? ` · par ${totalPar}` : ""}
+                  {holes.length === 0 && " · open the course page first to load holes"}
+                </div>
               </div>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setCourseId(null);
+                  setWantedLayout(MAIN_LAYOUT);
+                }}
+              >
+                Change
+              </Button>
             </div>
-            <Button size="sm" onClick={() => setCourseId(null)}>
-              Change
-            </Button>
+            {layouts.length > 1 && (
+              <div className="mt-2 flex gap-2 overflow-x-auto [scrollbar-width:none]">
+                {layouts.map((l) => (
+                  <Chip key={l.layoutId} active={l.layoutId === layout?.layoutId} onClick={() => setWantedLayout(l.layoutId)}>
+                    {l.name}
+                    {formatLengthBin(l.lengthBin) && <span className={cx("normal-case", l.layoutId === layout?.layoutId ? "opacity-70" : "text-ink-3")}>· {formatLengthBin(l.lengthBin)}</span>}
+                  </Chip>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <div>

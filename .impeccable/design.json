@@ -1,0 +1,229 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-18T00:00:00Z",
+  "title": "Design System: Medisc",
+  "extensions": {
+    "colorMeta": {
+      "lime": {
+        "role": "primary",
+        "displayName": "Acid Lime",
+        "canonical": "#d2ff00",
+        "tonalRamp": ["oklch(20% 0.06 118)", "oklch(32% 0.09 118)", "oklch(44% 0.12 118)", "oklch(56% 0.15 118)", "oklch(68% 0.18 118)", "oklch(80% 0.21 118)", "oklch(94% 0.225 118)", "oklch(97% 0.12 118)"]
+      },
+      "lime-2": {
+        "role": "primary",
+        "displayName": "Lime Lift",
+        "canonical": "#e4ff5c",
+        "tonalRamp": ["oklch(20% 0.05 118)", "oklch(32% 0.08 118)", "oklch(44% 0.11 118)", "oklch(56% 0.14 118)", "oklch(68% 0.16 118)", "oklch(80% 0.18 118)", "oklch(95% 0.18 118)", "oklch(98% 0.08 118)"]
+      },
+      "on-lime": {
+        "role": "primary",
+        "displayName": "Olive on Lime",
+        "canonical": "#282c20",
+        "tonalRamp": ["oklch(15% 0.015 125)", "oklch(27% 0.02 125)", "oklch(35% 0.02 125)", "oklch(45% 0.02 125)", "oklch(55% 0.02 125)", "oklch(65% 0.02 125)", "oklch(80% 0.02 125)", "oklch(95% 0.01 125)"]
+      },
+      "lime-hairline": { "role": "primary", "displayName": "Lime Hairline", "canonical": "rgba(210, 255, 0, 0.16)", "tonalRamp": ["rgba(210, 255, 0, 0.06)", "rgba(210, 255, 0, 0.1)", "rgba(210, 255, 0, 0.14)", "rgba(210, 255, 0, 0.16)", "rgba(210, 255, 0, 0.3)", "rgba(210, 255, 0, 0.35)", "rgba(210, 255, 0, 0.6)", "rgba(210, 255, 0, 1)"] },
+      "birdie-soft": { "role": "primary", "displayName": "Birdie Wash", "canonical": "rgba(210, 255, 0, 0.14)", "tonalRamp": ["rgba(210, 255, 0, 0.04)", "rgba(210, 255, 0, 0.08)", "rgba(210, 255, 0, 0.14)", "rgba(210, 255, 0, 0.2)", "rgba(210, 255, 0, 0.35)", "rgba(210, 255, 0, 0.5)", "rgba(210, 255, 0, 0.75)", "rgba(210, 255, 0, 1)"] },
+      "charcoal-ground": {
+        "role": "neutral",
+        "displayName": "Charcoal Ground",
+        "canonical": "#3b3c38",
+        "tonalRamp": ["oklch(15% 0.006 110)", "oklch(25% 0.006 110)", "oklch(35% 0.006 110)", "oklch(45% 0.006 110)", "oklch(55% 0.006 110)", "oklch(65% 0.006 110)", "oklch(80% 0.006 110)", "oklch(95% 0.006 110)"]
+      },
+      "charcoal-deep": {
+        "role": "neutral",
+        "displayName": "Charcoal Deep",
+        "canonical": "#2f302c",
+        "tonalRamp": ["oklch(15% 0.006 110)", "oklch(22% 0.006 110)", "oklch(30% 0.006 110)", "oklch(40% 0.006 110)", "oklch(50% 0.006 110)", "oklch(62% 0.006 110)", "oklch(78% 0.006 110)", "oklch(94% 0.006 110)"]
+      },
+      "olive-panel": {
+        "role": "neutral",
+        "displayName": "Olive Panel",
+        "canonical": "#282c20",
+        "tonalRamp": ["oklch(15% 0.015 125)", "oklch(27% 0.02 125)", "oklch(35% 0.02 125)", "oklch(45% 0.02 125)", "oklch(55% 0.02 125)", "oklch(65% 0.02 125)", "oklch(80% 0.02 125)", "oklch(95% 0.01 125)"]
+      },
+      "olive-raised": {
+        "role": "neutral",
+        "displayName": "Olive Raised",
+        "canonical": "#3a3f2e",
+        "tonalRamp": ["oklch(15% 0.02 125)", "oklch(25% 0.025 125)", "oklch(35% 0.025 125)", "oklch(45% 0.025 125)", "oklch(55% 0.025 125)", "oklch(65% 0.025 125)", "oklch(80% 0.02 125)", "oklch(95% 0.01 125)"]
+      },
+      "olive-pressed": {
+        "role": "neutral",
+        "displayName": "Olive Pressed",
+        "canonical": "#48503a",
+        "tonalRamp": ["oklch(15% 0.02 125)", "oklch(25% 0.03 125)", "oklch(41% 0.03 125)", "oklch(50% 0.03 125)", "oklch(60% 0.03 125)", "oklch(70% 0.03 125)", "oklch(82% 0.02 125)", "oklch(95% 0.01 125)"]
+      },
+      "chalk": {
+        "role": "neutral",
+        "displayName": "Chalk",
+        "canonical": "#f4f4ed",
+        "tonalRamp": ["oklch(15% 0.008 105)", "oklch(25% 0.008 105)", "oklch(35% 0.008 105)", "oklch(45% 0.008 105)", "oklch(55% 0.008 105)", "oklch(72% 0.008 105)", "oklch(85% 0.008 105)", "oklch(96.5% 0.008 105)"]
+      },
+      "chalk-2": {
+        "role": "neutral",
+        "displayName": "Chalk 2",
+        "canonical": "#cfd0c4",
+        "tonalRamp": ["oklch(15% 0.01 108)", "oklch(25% 0.01 108)", "oklch(35% 0.01 108)", "oklch(45% 0.01 108)", "oklch(55% 0.01 108)", "oklch(72% 0.01 108)", "oklch(85% 0.01 108)", "oklch(95% 0.01 108)"]
+      },
+      "chalk-3": {
+        "role": "neutral",
+        "displayName": "Chalk 3",
+        "canonical": "#acaea0",
+        "tonalRamp": ["oklch(15% 0.012 108)", "oklch(25% 0.012 108)", "oklch(35% 0.012 108)", "oklch(45% 0.012 108)", "oklch(55% 0.012 108)", "oklch(74% 0.012 108)", "oklch(85% 0.012 108)", "oklch(95% 0.012 108)"]
+      },
+      "chalk-hairline": { "role": "neutral", "displayName": "Chalk Hairline", "canonical": "rgba(244, 244, 237, 0.22)", "tonalRamp": ["rgba(244, 244, 237, 0.06)", "rgba(244, 244, 237, 0.1)", "rgba(244, 244, 237, 0.16)", "rgba(244, 244, 237, 0.22)", "rgba(244, 244, 237, 0.35)", "rgba(244, 244, 237, 0.5)", "rgba(244, 244, 237, 0.75)", "rgba(244, 244, 237, 1)"] },
+      "signal-red": {
+        "role": "tertiary",
+        "displayName": "Signal Red",
+        "canonical": "#ff5b3a",
+        "tonalRamp": ["oklch(20% 0.08 33)", "oklch(30% 0.12 33)", "oklch(40% 0.16 33)", "oklch(50% 0.2 33)", "oklch(60% 0.21 33)", "oklch(68% 0.2 33)", "oklch(82% 0.12 33)", "oklch(95% 0.04 33)"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The current hole number in the scorecard overlay (84px). Stats form figure 72px, Home live score 56px." },
+      "headline": { "displayName": "Headline", "purpose": "The two-line Home greeting (46px); scorecard stroke count 44px; hole par, length and distance 36px." },
+      "title": { "displayName": "Title", "purpose": "Page headers, the live panel course name, round-row score numerals, stat-tile values (30px)." },
+      "subtitle": { "displayName": "Subtitle", "purpose": "Section headings and sheet titles (26px); empty-state headings 22-24px." },
+      "body": { "displayName": "Body", "purpose": "Default copy at 15px/500; panel copy at 14px in chalk-2." },
+      "body-strong": { "displayName": "Body Strong", "purpose": "Names and course titles inside rows (15px/800)." },
+      "label": { "displayName": "Label", "purpose": "Every meta line, stat label, chip, segment and tab: 11px/800 uppercase, 0.02em." },
+      "button": { "displayName": "Button", "purpose": "Button text: 12/13/15px by size, 800, uppercase, 0.03em." }
+    },
+    "shadows": [
+      { "name": "card", "value": "none", "purpose": "The card shadow token resolves to none; panels are flat and depth is a tone step." },
+      { "name": "marker-drop", "value": "0 2px 6px rgba(0, 0, 0, 0.45)", "purpose": "Hole markers and course pins over map tiles, for legibility over imagery." },
+      { "name": "user-halo", "value": "0 0 0 3px rgba(210, 255, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.5)", "purpose": "The player's own position dot on the map." }
+    ],
+    "motion": [
+      { "name": "state-colour", "value": "color, background-color, border-color 150ms ease", "purpose": "Every hover and pressed state on buttons, chips, tabs and segments." },
+      { "name": "strike", "value": "120ms steps(2, end), colour from lime to inherit", "purpose": "A score numeral snapping in on the scorecard; no tween on the digit." },
+      { "name": "overlay-in", "value": "260ms cubic-bezier(0.16, 1, 0.3, 1), translateX(-12px) and opacity 0.4 to rest", "purpose": "The hole overlay sliding in on each hole change." },
+      { "name": "reduced-motion", "value": "animation-duration 0.01ms; transition-duration 0.01ms", "purpose": "prefers-reduced-motion disables both authored moments and the state transitions." }
+    ],
+    "breakpoints": [
+      { "name": "column", "value": "480px", "purpose": "The single centred app column; no wider layout exists." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one forward action on a screen: Start a round, Next hole, Finish, Play.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polygon points=\"6 3 20 12 6 21 6 3\"/></svg>Start a round</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 56px; padding: 0 24px; border: 0; border-radius: 39px; background: var(--lime, #d2ff00); color: var(--on-lime, #282c20); font-family: 'Mona Sans', ui-sans-serif, system-ui, sans-serif; font-size: 15px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; cursor: pointer; transition: background-color 150ms ease; } .ds-btn-primary:hover, .ds-btn-primary:active { background: var(--lime-2, #e4ff5c); } .ds-btn-primary:focus-visible { outline: 2px solid var(--lime, #d2ff00); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.4; pointer-events: none; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "The default button: olive raised with a chalk hairline. Previous hole, cancel, open.",
+      "html": "<button class=\"ds-btn-secondary\">Previous hole</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px; border: 1px solid var(--line-strong, rgba(244,244,237,0.22)); border-radius: 39px; background: var(--surface-2, #3a3f2e); color: var(--ink, #f4f4ed); font-family: 'Mona Sans', ui-sans-serif, system-ui, sans-serif; font-size: 13px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; cursor: pointer; transition: background-color 150ms ease; } .ds-btn-secondary:hover, .ds-btn-secondary:active { background: var(--surface-3, #48503a); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--lime, #d2ff00); outline-offset: 2px; } .ds-btn-secondary:disabled { opacity: 0.4; pointer-events: none; }"
+    },
+    {
+      "name": "Brand Button",
+      "kind": "button",
+      "refersTo": "button-brand",
+      "description": "Chalk fill with olive text for save and submit inside forms and sheets.",
+      "html": "<button class=\"ds-btn-brand\">Save</button>",
+      "css": ".ds-btn-brand { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px; border: 0; border-radius: 39px; background: var(--ink, #f4f4ed); color: var(--on-lime, #282c20); font-family: 'Mona Sans', ui-sans-serif, system-ui, sans-serif; font-size: 13px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; cursor: pointer; transition: background-color 150ms ease; } .ds-btn-brand:hover, .ds-btn-brand:active { background: #ffffff; } .ds-btn-brand:focus-visible { outline: 2px solid var(--lime, #d2ff00); outline-offset: 2px; }"
+    },
+    {
+      "name": "Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Filter and selection chips; selected fills lime with olive text.",
+      "html": "<div style=\"display:flex;gap:8px\"><button class=\"ds-chip\" aria-pressed=\"false\">Last 20</button><button class=\"ds-chip ds-chip--on\" aria-pressed=\"true\">All</button></div>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border: 1px solid var(--line-strong, rgba(244,244,237,0.22)); border-radius: 39px; background: transparent; color: var(--ink, #f4f4ed); font-family: 'Mona Sans', ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-weight: 800; letter-spacing: 0.02em; line-height: 1; text-transform: uppercase; cursor: pointer; transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease; } .ds-chip:hover { background: var(--surface-2, #3a3f2e); } .ds-chip--on, .ds-chip--on:hover { background: var(--lime, #d2ff00); border-color: var(--lime, #d2ff00); color: var(--on-lime, #282c20); } .ds-chip:focus-visible { outline: 2px solid var(--lime, #d2ff00); outline-offset: 2px; }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Text input: olive fill, chalk hairline, 6px corners, lime border on focus.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field__label\">Course name</span><input class=\"ds-field__input\" placeholder=\"Course name, city or park\"><span class=\"ds-field__hint\">Search the US directory.</span></label>",
+      "css": ".ds-field { display: block; font-family: 'Mona Sans', ui-sans-serif, system-ui, sans-serif; } .ds-field__label { display: block; margin-bottom: 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.02em; line-height: 1; text-transform: uppercase; color: var(--ink-2, #cfd0c4); } .ds-field__input { width: 100%; height: 48px; padding: 0 14px; border: 1px solid var(--line-strong, rgba(244,244,237,0.22)); border-radius: 6px; background: var(--surface, #282c20); color: var(--ink, #f4f4ed); font: inherit; font-size: 15px; font-weight: 600; caret-color: var(--lime, #d2ff00); } .ds-field__input::placeholder { color: var(--ink-3, #acaea0); font-weight: 500; } .ds-field__input:focus { outline: none; border-color: var(--lime, #d2ff00); } .ds-field__hint { display: block; margin-top: 6px; font-size: 12px; font-weight: 500; color: var(--ink-3, #acaea0); }"
+    },
+    {
+      "name": "Tab Bar",
+      "kind": "nav",
+      "refersTo": "tab-bar",
+      "description": "Fixed bottom navigation: olive, lime 30% top edge, four line icons over uppercase labels; active is lime.",
+      "html": "<nav class=\"ds-tabbar\" aria-label=\"Main\"><a class=\"ds-tab ds-tab--active\" href=\"#\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 10l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/><path d=\"M9 22V12h6v10\"/></svg>Home</a><a class=\"ds-tab\" href=\"#\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M18 8c0 4.5-6 9-6 9s-6-4.5-6-9a6 6 0 0 1 12 0\"/><circle cx=\"12\" cy=\"8\" r=\"2\"/><path d=\"M8.8 14H5l-3 6h20l-3-6h-3.8\"/></svg>Courses</a><a class=\"ds-tab\" href=\"#\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 12h11M10 18h11M10 6h11M4 10h2M4 6h1v4M6 18H4c0-1 2-2 2-3s-1-1.5-2-1\"/></svg>Rounds</a><a class=\"ds-tab\" href=\"#\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 3v18h18M18 17V9M13 17V5M8 17v-3\"/></svg>Stats</a></nav>",
+      "css": ".ds-tabbar { display: flex; width: 100%; max-width: 480px; height: 64px; border-top: 1px solid rgba(210, 255, 0, 0.3); background: var(--surface, #282c20); font-family: 'Mona Sans', ui-sans-serif, system-ui, sans-serif; } .ds-tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--ink-3, #acaea0); font-size: 11px; font-weight: 800; letter-spacing: 0.02em; line-height: 1; text-transform: uppercase; text-decoration: none; transition: color 150ms ease; } .ds-tab:hover { color: var(--ink-2, #cfd0c4); } .ds-tab--active, .ds-tab--active:hover { color: var(--lime, #d2ff00); } .ds-tab:focus-visible { outline: 2px solid var(--lime, #d2ff00); outline-offset: -2px; }"
+    },
+    {
+      "name": "Round Row Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "An olive 14px panel of rows divided by lime hairlines; serif score numeral in lime when under par.",
+      "html": "<div class=\"ds-card\"><button class=\"ds-row\"><span class=\"ds-row__main\"><span class=\"ds-row__title\">Blair Mill Disc Golf Course</span><span class=\"ds-row__meta\">Sun 14 Sep · with Sam <span class=\"ds-row__won\">· Won</span></span></span><span class=\"ds-row__score\"><span class=\"ds-row__num ds-row__num--under\">-3</span><span class=\"ds-row__meta\">51 · 18 holes</span></span></button><button class=\"ds-row\"><span class=\"ds-row__main\"><span class=\"ds-row__title\">Ballantyne Crash Course</span><span class=\"ds-row__meta\">Sat 6 Sep</span></span><span class=\"ds-row__score\"><span class=\"ds-row__num\">+2</span><span class=\"ds-row__meta\">56 · 18 holes</span></span></button></div>",
+      "css": ".ds-card { overflow: hidden; border-radius: 14px; background: var(--surface, #282c20); font-family: 'Mona Sans', ui-sans-serif, system-ui, sans-serif; color: var(--ink, #f4f4ed); } .ds-row { display: flex; align-items: center; gap: 11px; width: 100%; padding: 15px 22px; border: 0; border-bottom: 1px solid var(--line, rgba(210,255,0,0.16)); background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit; } .ds-row:last-child { border-bottom: 0; } .ds-row:hover, .ds-row:active { background: var(--surface-2, #3a3f2e); } .ds-row:focus-visible { outline: 2px solid var(--lime, #d2ff00); outline-offset: -2px; } .ds-row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; } .ds-row__title { font-size: 15px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-row__meta { font-size: 11px; font-weight: 800; letter-spacing: 0.02em; line-height: 1; text-transform: uppercase; color: var(--ink-3, #acaea0); } .ds-row__won { color: var(--lime, #d2ff00); } .ds-row__score { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; } .ds-row__num { font-family: 'Young Serif', Georgia, serif; font-size: 30px; font-weight: 400; line-height: 0.85; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--ink, #f4f4ed); } .ds-row__num--under { color: var(--lime, #d2ff00); }"
+    },
+    {
+      "name": "Stat Tile",
+      "kind": "card",
+      "refersTo": "stat-tile",
+      "description": "Label over a serif value on a 6px olive tile; lime for good, signal red for bad.",
+      "html": "<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px\"><div class=\"ds-stat\"><div class=\"ds-stat__label\">Birdie or better</div><div class=\"ds-stat__value ds-stat__value--good\">31%</div><div class=\"ds-stat__sub\">last 20 rounds</div></div><div class=\"ds-stat\"><div class=\"ds-stat__label\">Average</div><div class=\"ds-stat__value\">+2.4</div><div class=\"ds-stat__sub\">to par per round</div></div></div>",
+      "css": ".ds-stat { padding: 11px; border-radius: 6px; background: var(--surface, #282c20); font-family: 'Mona Sans', ui-sans-serif, system-ui, sans-serif; color: var(--ink, #f4f4ed); } .ds-stat__label { font-size: 11px; font-weight: 800; letter-spacing: 0.02em; line-height: 1; text-transform: uppercase; color: var(--ink-3, #acaea0); } .ds-stat__value { margin-top: 8px; font-family: 'Young Serif', Georgia, serif; font-size: 30px; font-weight: 400; line-height: 0.85; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; } .ds-stat__value--good { color: var(--lime, #d2ff00); } .ds-stat__value--bad { color: var(--triple, #ff5b3a); } .ds-stat__sub { margin-top: 6px; font-size: 12px; font-weight: 500; color: var(--ink-3, #acaea0); }"
+    },
+    {
+      "name": "Score Cell",
+      "kind": "custom",
+      "refersTo": "score-cell-under",
+      "description": "Per-hole score squares coloured by the Score Tone Rule: lime under par, hairline par, chalk outline bogey, chalk fill double, signal red triple.",
+      "html": "<div style=\"display:flex;gap:6px\"><span class=\"ds-cell ds-cell--ace\">1</span><span class=\"ds-cell ds-cell--birdie\">2</span><span class=\"ds-cell ds-cell--par\">3</span><span class=\"ds-cell ds-cell--bogey\">4</span><span class=\"ds-cell ds-cell--double\">5</span><span class=\"ds-cell ds-cell--triple\">6</span><span class=\"ds-cell ds-cell--unscored\">–</span></div>",
+      "css": ".ds-cell { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 6px; font-family: 'Mona Sans', ui-sans-serif, system-ui, sans-serif; font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; box-sizing: border-box; } .ds-cell--ace { background: var(--lime, #d2ff00); color: var(--on-lime, #282c20); box-shadow: inset 0 0 0 2px var(--on-lime, #282c20); } .ds-cell--birdie { background: var(--lime, #d2ff00); color: var(--on-lime, #282c20); } .ds-cell--par { background: transparent; color: var(--ink, #f4f4ed); border: 1px solid var(--line-strong, rgba(244,244,237,0.22)); } .ds-cell--bogey { background: transparent; color: var(--ink, #f4f4ed); border: 2px solid var(--ink, #f4f4ed); } .ds-cell--double { background: var(--ink, #f4f4ed); color: var(--on-lime, #282c20); } .ds-cell--triple { background: var(--triple, #ff5b3a); color: var(--on-lime, #282c20); } .ds-cell--unscored { background: transparent; color: var(--ink-3, #acaea0); border: 1px solid var(--line, rgba(210,255,0,0.16)); }"
+    },
+    {
+      "name": "Hole Overlay",
+      "kind": "custom",
+      "refersTo": "hole-overlay",
+      "description": "The scorecard masthead: a lime panel with the hole number at 84px serif, par and distance figures, and olive-outlined marker chips.",
+      "html": "<div class=\"ds-hole\"><div class=\"ds-hole__top\"><div><div class=\"ds-hole__label\">Hole</div><div class=\"ds-hole__num\">7</div></div><div class=\"ds-hole__figs\"><div><div class=\"ds-hole__label\">Par</div><div class=\"ds-hole__fig\">3</div></div><div><div class=\"ds-hole__label\">Length</div><div class=\"ds-hole__fig\">312 ft</div></div><div><div class=\"ds-hole__label\">Basket</div><div class=\"ds-hole__fig\">88 ft</div></div></div></div><div class=\"ds-hole__row\"><button class=\"ds-hole__chip ds-hole__chip--set\">Tee here</button><button class=\"ds-hole__chip\">Basket here</button><span class=\"ds-hole__gps\">GPS ±16 ft</span></div></div>",
+      "css": ".ds-hole { padding: 11px 22px 15px; border-radius: 14px; background: var(--lime, #d2ff00); color: var(--on-lime, #282c20); font-family: 'Mona Sans', ui-sans-serif, system-ui, sans-serif; animation: ds-overlay-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both; } .ds-hole__top { display: flex; align-items: flex-end; justify-content: space-between; gap: 11px; } .ds-hole__label { font-size: 11px; font-weight: 800; letter-spacing: 0.02em; line-height: 1; text-transform: uppercase; } .ds-hole__num { font-family: 'Young Serif', Georgia, serif; font-size: 84px; font-weight: 400; line-height: 0.8; letter-spacing: -0.02em; } .ds-hole__figs { display: flex; gap: 22px; padding-bottom: 4px; text-align: right; } .ds-hole__fig { margin-top: 4px; font-family: 'Young Serif', Georgia, serif; font-size: 36px; font-weight: 400; line-height: 0.85; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; } .ds-hole__row { display: flex; align-items: center; gap: 8px; margin-top: 11px; } .ds-hole__chip { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 12px; border: 2px solid var(--on-lime, #282c20); border-radius: 39px; background: transparent; color: var(--on-lime, #282c20); font: inherit; font-size: 11px; font-weight: 800; letter-spacing: 0.02em; line-height: 1; text-transform: uppercase; cursor: pointer; } .ds-hole__chip--set { background: var(--on-lime, #282c20); color: var(--lime, #d2ff00); } .ds-hole__chip:focus-visible { outline: 2px solid var(--on-lime, #282c20); outline-offset: 2px; } .ds-hole__gps { margin-left: auto; font-size: 11px; font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase; opacity: 0.7; } @keyframes ds-overlay-in { from { transform: translateX(-12px); opacity: 0.4; } to { transform: translateX(0); opacity: 1; } } @media (prefers-reduced-motion: reduce) { .ds-hole { animation-duration: 0.01ms; } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Timing Screen",
+    "overview": "Medisc is a scorecard read in direct sun with one hand free, so the world is built like a race-hub timing screen: a charcoal ground, dark olive panels stepped up in tone, and one working colour, acid lime, reserved for whatever is live right now. There is no pale card kit and no pastel score palette. Numbers are the content, and they are set in a heavy humanist serif at sizes that read from arm's length; everything around them is small, dense, uppercase sans meta.\n\nThe system is dark-only and flat. Depth is carried by tone (ground, panel, raised, pressed) and by lime hairlines, never by drop shadows on the field. Corners run on a four-step scale, and the two extremes carry meaning: tight 6px corners for data cells and inputs, full 39px pills for anything the player is about to press. Motion is limited to two authored moments (the score strike and the hole overlay slide) and honours reduced-motion.\n\nThe Lando Norris site system was pinned as the source; Brier was replaced by the free Young Serif and the label face is Mona Sans. What is recorded here is how that pinning landed in the build.",
+    "keyCharacteristics": [
+      "Charcoal ground, dark olive panels, one accent: acid lime means live, selected, under par, or forward.",
+      "Heavy tight serif for every number and heading (line-height 0.8–0.85, tracking -0.02em); small 800-weight uppercase sans for labels.",
+      "Flat surfaces, tonal depth, lime hairlines at 16% alpha; no drop shadows on the field.",
+      "11px spacing base (11 / 22 / 33 / 44); single 480px mobile column.",
+      "Radii 2 / 6 / 14 / 39: data cells and inputs at 6, cards and sheets at 14, buttons and live panels at 39."
+    ],
+    "rules": [
+      { "name": "The One Live Colour Rule", "body": "Lime marks what is live, selected, under par, or the next forward action. It does not decorate. If two lime surfaces sit side by side, one of them is wrong.", "section": "colors" },
+      { "name": "The Olive-on-Lime Rule", "body": "Text and icons on a lime surface are dark olive (on-lime), including outlines and chips inside the live panel and hole overlay. Chalk never sits on lime.", "section": "colors" },
+      { "name": "The Score Tone Rule", "body": "Under par is lime (ace carries a dark inset ring, eagle a 40% ring), par is a chalk hairline outline, bogey a 2px chalk outline, double bogey a chalk fill with olive text, triple or worse a signal-red fill with olive text. The same tones colour running totals and per-hole numerals.", "section": "colors" },
+      { "name": "The Serif Owns the Numbers Rule", "body": "Any score, par, distance, count or heading is set in Young Serif with tabular numerals. The sans never carries a headline or a hero figure.", "section": "typography" },
+      { "name": "The Tight Set Rule", "body": "Display text is set at line-height 0.8–0.85 and tracking -0.02em without exception. No optical loosening at small sizes; drop to the sans instead.", "section": "typography" },
+      { "name": "The Flat Field Rule", "body": "No box shadows on panels, buttons, chips, sheets or toasts. Depth is a tone step or a lime hairline. Shadows exist only on map markers.", "section": "elevation" },
+      { "name": "The Lime Edge Rule", "body": "A surface that must read as a separate layer (tab bar, action row, sheet) gets a 1px lime top edge, at 30% for bars and full for sheets, instead of a shadow.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do set every number and heading in Young Serif at 400 with tabular numerals, line-height 0.8–0.85 and -0.02em tracking.",
+      "Do put dark olive (on-lime) text and outlines on any lime surface, including chips and dots inside it.",
+      "Do use lime for exactly the live, selected, under-par or forward element on a screen and nothing else.",
+      "Do separate rows with a lime hairline at 16% and separate layers with a tone step or a lime top edge.",
+      "Do keep spacing on the 11px base (11 / 22 / 33 / 44) and buttons on the 36 / 44 / 56 height ladder as 39px pills.",
+      "Do use 6px corners for data (cells, tiles, inputs) and 14px for containers.",
+      "Do colour scores by the Score Tone Rule so the same outcome reads identically in a cell, a running total and a chart.",
+      "Do keep the two authored motions (120ms stepped strike, 260ms overlay slide) and disable them under reduced motion."
+    ],
+    "donts": [
+      "Don't put a box shadow on any panel, button, chip, sheet or toast; shadows belong to map markers only.",
+      "Don't set chalk text on lime, or lime text on chalk.",
+      "Don't use a second accent; signal red is for danger actions and triple-bogey-or-worse only.",
+      "Don't introduce a light theme, pale cards or pastel score colours; the system is dark-only and the theme preference always resolves to dark.",
+      "Don't bold or track-out the serif, or drop the sans below weight 500.",
+      "Don't use a 39px pill on a data cell or a 6px corner on a button; the radius carries meaning.",
+      "Don't add drop shadows, gradients or glows to acknowledge a tap; a tone step (lime-2, olive-raised, olive-pressed) is the whole state change."
+    ]
+  }
+}

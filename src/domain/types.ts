@@ -38,11 +38,42 @@ export interface Course extends Timestamps {
   website?: string;
   tags?: Record<string, string>;
   fetchedHolesAt?: number;
+  /** Comma-separated difficulty bins (easy, intermediate, challenging, very-challenging). */
+  difficulty?: string;
+  /** Average player rating out of 5. */
+  rating?: number;
+}
+
+/**
+ * A named set of tees and baskets on a course ("Long", "Short", "Blue tees"). Every course has a
+ * main layout; imported courses may have more. Holes belong to exactly one layout.
+ */
+export interface Layout {
+  /** `${courseId}/${layoutId}` so one table holds every course's layouts. */
+  id: string;
+  courseId: string;
+  /** Stable across devices and the shared database: "main", or "udisc-l<id>" for imports. */
+  layoutId: string;
+  name: string;
+  holeCount: number;
+  par?: number;
+  /** Total length in metres. */
+  distanceM?: number;
+  /** UDisc difficulty bin for this layout: easy, intermediate, challenging, very-challenging. */
+  difficulty?: string;
+  /** UDisc technicality bin: open, mild, technical, highly-technical. */
+  technicality?: string;
+  /** UDisc length bin: short, intermediate, long, very-long. */
+  lengthBin?: string;
+  /** Rounds played on this layout in the last 30 days, per UDisc. */
+  playCount?: number;
+  updatedAt: number;
 }
 
 export interface Hole {
   id: string;
   courseId: string;
+  layoutId: string;
   number: number;
   par: number;
   distanceM?: number;
@@ -57,6 +88,9 @@ export interface Round extends Timestamps {
   id: string;
   courseId: string;
   courseName: string;
+  /** Layout played; missing on rounds from before layouts existed, meaning main. */
+  layoutId?: string;
+  layoutName?: string;
   startedAt: number;
   finishedAt?: number;
   playerIds: string[];

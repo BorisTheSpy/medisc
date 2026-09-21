@@ -1,25 +1,32 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import { Play, Pencil, RefreshCw, ExternalLink } from "lucide-react";
-import { useAllScores, useCourse, useHoles, useMe, useRounds, useSetting } from "@/db/hooks";
+import { useAllScores, useCourse, useHoles, useLayouts, useMe, useRounds, useSetting } from "@/db/hooks";
 import { fetchCourseHoles } from "@/services/overpass";
-import { fetchCommunityHoles, mergeHoles, publishCourseNow } from "@/services/community";
-import { saveHoles, setSetting } from "@/db/repo";
+import { fetchCommunityHoles, mergeHoles, publishCourseNow, hideCourse } from "@/services/community";
+import { saveHoles, setSetting, upsertLayouts } from "@/db/repo";
+import { MAIN_LAYOUT, formatLengthBin, layoutsFor, pickLayout, roundLayoutId } from "@/domain/layouts";
 import { db } from "@/db/db";
 import { useGeolocation } from "@/services/useGeolocation";
-import { formatHoleDistance, type Units } from "@/domain/geo";
+import { formatDifficulty, formatHoleDistance, type Units } from "@/domain/geo";
 import { holeStatsForCourse, perCourse } from "@/domain/stats";
 import { formatToPar } from "@/domain/scoring";
 import { avg } from "@/lib/format";
-import { Button, IconButton, PageHeader, Section, Spinner, StatTile, cx } from "@/components/ui";
+import { Button, Chip, IconButton, PageHeader, Section, Sheet, Spinner, StatTile, cx } from "@/components/ui";
 import { CourseMap } from "@/map/CourseMap";
 import type { Hole } from "@/domain/types";
 
 export function CourseDetailRoute() {
   const { id } = useParams();
   const nav = useNavigate();
+  const [params] = useSearchParams();
   const course = useCourse(id);
-  const holes = useHoles(id);
+  const layoutRows = useLayouts(id);
+  const layouts = useMemo(() => (course ? layoutsFor(course, layoutRows) : []), [course, layoutRows]);
+  const [wantedLayout, setWantedLayout] = useState<string>(params.get("layout") || MAIN_LAYOUT);
+  const layout = layouts.length ? pickLayout(layouts, wantedLayout) : null;
+  const layoutId = layout?.layoutId ?? MAIN_LAYOUT;
+  const holes = useHoles(id, layoutId);
   const me = useMe();
   const rounds = useRounds();
   const scores = useAllScores();
@@ -30,13 +37,23 @@ export function CourseDetailRoute() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [activeHole, setActiveHole] = useState<number | undefined>(undefined);
   const [shareState, setShareState] = useState<"idle" | "busy" | "done" | "failed">("idle");
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reporting, setReporting] = useState(false);
+
+  async function reportNotACourse() {
+    if (!course) return;
+    setReporting(true);
+    await hideCourse(course);
+    await db.courses.update(course.id, { deletedAt: Date.now(), updatedAt: Date.now() });
+    nav("/courses", { replace: true });
+  }
   const attempted = useRef(false);
 
   const needsFetch = course && course.source !== "custom" && !course.fetchedHolesAt;
 
   function defaultHoles(): Hole[] {
     const now = Date.now();
-    return Array.from({ length: course?.holeCount || 18 }, (_, i) => ({ id: `${course!.id}-${i + 1}`, courseId: course!.id, number: i + 1, par: 3, updatedAt: now }));
+    return Array.from({ length: course?.holeCount || 18 }, (_, i) => ({ id: `${course!.id}-${i + 1}`, courseId: course!.id, layoutId: MAIN_LAYOUT, number: i + 1, par: 3, updatedAt: now }));
   }
 
   /** Pull shared holes (other players' pins and pars) and merge them into the local copy. */
@@ -49,8 +66,19 @@ export function CourseDetailRoute() {
         await db.courses.update(course.id, { name: shared.name, updatedAt: Date.now() });
         await db.rounds.where("courseId").equals(course.id).modify({ courseName: shared.name });
       }
+      if ((shared.difficulty && shared.difficulty !== course.difficulty) || (shared.rating !== undefined && shared.rating !== course.rating)) {
+        await db.courses.update(course.id, { difficulty: shared.difficulty ?? course.difficulty, rating: shared.rating ?? course.rating, updatedAt: Date.now() });
+      }
+      if (shared.layouts.length > 0) await upsertLayouts(course.id, shared.layouts.map(({ holes: _holes, ...meta }) => meta));
+      // Extra layouts only ever come from the shared database, so merge each one on its own.
+      for (const l of shared.layouts) {
+        if (l.layoutId === MAIN_LAYOUT || l.holes.length === 0) continue;
+        const localLayout = await db.holes.where("[courseId+layoutId]").equals([course.id, l.layoutId]).toArray();
+        const { merged, changed } = mergeHoles(localLayout, l.holes);
+        if (changed) await saveHoles(course.id, merged, true, l.layoutId);
+      }
       if (shared.holes.length === 0) return false;
-      const local = await db.holes.where("courseId").equals(course.id).toArray();
+      const local = await db.holes.where("[courseId+layoutId]").equals([course.id, MAIN_LAYOUT]).toArray();
       const { merged, changed } = mergeHoles(local, shared.holes);
       if (changed) await saveHoles(course.id, merged);
       return true;
@@ -64,13 +92,13 @@ export function CourseDetailRoute() {
     setFetching(true);
     setFetchError(null);
     // Make the course playable right away, but only if it truly has no holes yet (read storage, not React state).
-    const stored = await db.holes.where("courseId").equals(course.id).count();
+    const stored = await db.holes.where("[courseId+layoutId]").equals([course.id, MAIN_LAYOUT]).count();
     if (stored === 0) await saveHoles(course.id, defaultHoles(), false);
     try {
       const hadShared = await syncShared();
       if (course.source === "community") return; // community courses only come from the shared database
       const found = await fetchCourseHoles(course);
-      const local = await db.holes.where("courseId").equals(course.id).toArray();
+      const local = await db.holes.where("[courseId+layoutId]").equals([course.id, MAIN_LAYOUT]).toArray();
       if (found.length > 0) {
         // Keep local pins and pars edited by players; OSM fills in only what nobody has mapped.
         const { merged } = mergeHoles(found, local.filter((h) => h.tee || h.basket));
@@ -98,7 +126,9 @@ export function CourseDetailRoute() {
 
   const finished = useMemo(() => rounds.filter((r) => r.finishedAt && r.courseId === id), [rounds, id]);
   const mine = useMemo(() => (me && id ? perCourse(finished, scores, me.id).find((c) => c.courseId === id) : undefined), [finished, scores, me, id]);
-  const holeStats = useMemo(() => (me && id ? holeStatsForCourse(finished, scores, me.id, id) : []), [finished, scores, me, id]);
+  // Per-hole numbers only make sense within one layout: hole 3 long and hole 3 short are different holes.
+  const onThisLayout = useMemo(() => finished.filter((r) => roundLayoutId(r) === layoutId), [finished, layoutId]);
+  const holeStats = useMemo(() => (me && id ? holeStatsForCourse(onThisLayout, scores, me.id, id) : []), [onThisLayout, scores, me, id]);
   const mapped = holes.filter((h) => h.tee && h.basket).length;
   const totalPar = holes.reduce((a, h) => a + h.par, 0);
   const totalLen = holes.reduce((a, h) => a + (h.distanceM ?? 0), 0);
@@ -122,10 +152,12 @@ export function CourseDetailRoute() {
     <div>
       <PageHeader
         title={course.name}
-        sub={[course.city, `${holes.length || course.holeCount} holes`, totalPar ? `par ${totalPar}` : null, totalLen ? formatHoleDistance(totalLen, units) : null].filter(Boolean).join(" · ")}
+        sub={[course.city, `${holes.length || layout?.holeCount || course.holeCount} holes`, totalPar ? `par ${totalPar}` : null, totalLen ? formatHoleDistance(totalLen, units) : null, formatDifficulty(layout?.difficulty ?? course.difficulty), course.rating ? `★ ${course.rating.toFixed(1)}` : null]
+          .filter(Boolean)
+          .join(" · ")}
         back={() => nav(-1)}
         right={
-          <IconButton label="Edit holes" onClick={() => nav(`/courses/${course.id}/edit`)}>
+          <IconButton label="Edit holes" onClick={() => nav(`/courses/${course.id}/edit?layout=${encodeURIComponent(layoutId)}`)}>
             <Pencil size={20} />
           </IconButton>
         }
@@ -151,9 +183,23 @@ export function CourseDetailRoute() {
           {!fetching && mapped === 0 && holes.length > 0 && <div className="absolute left-2 top-2 rounded-full bg-surface px-3 py-1.5 text-xs font-medium shadow-card">No tee or basket positions yet</div>}
         </CourseMap>
 
+        {layouts.length > 1 && (
+          <div className="mt-3">
+            <div className="label mb-2 text-ink-3">Layout</div>
+            <div className="flex gap-2 overflow-x-auto [scrollbar-width:none]">
+              {layouts.map((l) => (
+                <Chip key={l.layoutId} active={l.layoutId === layoutId} onClick={() => setWantedLayout(l.layoutId)}>
+                  {l.name}
+                  {formatLengthBin(l.lengthBin) && <span className={cx("normal-case", l.layoutId === layoutId ? "opacity-70" : "text-ink-3")}>· {formatLengthBin(l.lengthBin)}</span>}
+                </Chip>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="mt-3 flex gap-2">
-          <Button variant="primary" size="lg" className="flex-1" onClick={() => nav(`/play?course=${course.id}`)} disabled={holes.length === 0}>
-            <Play size={20} fill="currentColor" /> Play here
+          <Button variant="primary" size="lg" className="flex-1" onClick={() => nav(`/play?course=${course.id}&layout=${encodeURIComponent(layoutId)}`)} disabled={holes.length === 0}>
+            <Play size={20} fill="currentColor" /> Play {layouts.length > 1 && layout ? layout.name : "here"}
           </Button>
           {!geo.position && (
             <Button size="lg" onClick={geo.locate} aria-label="Show my position">
@@ -257,6 +303,25 @@ export function CourseDetailRoute() {
         )}
       </Section>
 
+      {course.source !== "custom" && (
+        <Section className="mt-6">
+          <button className="label text-ink-3 underline underline-offset-4" onClick={() => setReportOpen(true)}>
+            Not a disc golf course? Report it
+          </button>
+          <Sheet open={reportOpen} onClose={() => setReportOpen(false)} title="No disc golf here?">
+            <p className="text-[15px] font-medium text-ink-2">“{course.name}” will disappear from course search for everyone. Your rounds here stay in your history.</p>
+            <div className="mt-[22px] flex gap-[11px]">
+              <Button variant="danger" onClick={reportNotACourse} disabled={reporting}>
+                {reporting ? <Spinner /> : "Hide this place"}
+              </Button>
+              <Button variant="ghost" onClick={() => setReportOpen(false)}>
+                Keep it
+              </Button>
+            </div>
+          </Sheet>
+        </Section>
+      )}
+
       {(course.website || course.source !== "custom") && (
         <Section className="mt-6 mb-4">
           <div className="flex flex-wrap gap-3 text-xs text-ink-3">
@@ -272,7 +337,7 @@ export function CourseDetailRoute() {
             )}
             {course.source === "dga" && <span>Course data supplied by DiscGolfAPI.</span>}
             {course.source === "places" && <span>Powered by Google.</span>}
-            {course.source === "community" && <span>Added by a Medisc player.</span>}
+            {course.source === "community" && (course.tags?.origin === "udisc" ? <span>Layout and difficulty from UDisc.</span> : <span>Added by a Medisc player.</span>)}
           </div>
         </Section>
       )}

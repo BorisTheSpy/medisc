@@ -1,0 +1,121 @@
+{
+  "title": "Choose Medisc's visual world",
+  "question": "The roll assigned Coverage Graphics. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Coverage Graphics",
+      "kicker": "THE ROLL",
+      "lineage": "disc golf tournament broadcast graphics: leaderboard bugs, lower-third chyrons, hole overlays",
+      "thesis": "Your card, produced like the Sunday final: a leaderboard grammar of bars, chips and hole-by-hole cells that refuses the white-card kit.",
+      "palette": ["#0E1F3D", "#F4F6F2", "#F5D90A", "#2FB170", "#E5533D"],
+      "materials": ["chyron bars", "score chips", "hole-by-hole cells", "condensed athletic numerals"],
+      "viewport": "Home opens on a full-width navy chyron for the round in progress: course name as the lower-third, each player a bar with a struck score chip. Below, the hole-by-hole cell row like a TV scoreboard. Scorecard: hole overlay 'HOLE 7 · PAR 3 · 312 FT' as a bar, then each player's stroke scale 1–7 shown as ghost numerals with the chosen one struck forward.",
+      "risk": "Reads like a sports app if the bars are timid; the world only works at full chyron commitment, with a light field ground so it survives midday sun.",
+      "raised": [
+        { "from": "challenger-cathode", "raise": "Score entry shows every stroke value as a ghost with one struck forward; values snap, never tween." },
+        { "from": "challenger-telop", "raise": "Score chips carry contrast outlines so a birdie reads in direct sunlight." },
+        { "from": "challenger-crane", "raise": "Hole lists keep a strict numbered margin column." },
+        { "from": "challenger-sixpack", "raise": "Every stat tile shows its trend beside the value." }
+      ],
+      "comp": ".impeccable/mocks/decision/assigned.webp"
+    },
+    {
+      "id": "model-pick",
+      "label": "Tee Sign",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "painted-aluminium course signage at every tee",
+      "thesis": "Every screen is a tee sign: hole number enormous, par and distance as stamped facts, the hole diagram as the map.",
+      "palette": ["#1B4D2E", "#FFFFFF", "#F2B705", "#111111"],
+      "materials": ["painted aluminium", "reflective vinyl lettering", "routed hole diagrams"],
+      "viewport": "Scorecard as a sign face: the hole number fills the top third, par and distance stamped beneath, players below as engraved rows.",
+      "risk": "The most familiar direction for a course app; signage green is close to the look you rejected, so it would need a different sign colour standard.",
+      "comp": ".impeccable/mocks/decision/model-pick.webp"
+    },
+    {
+      "id": "challenger-transit",
+      "label": "Midnight Transit Diagram",
+      "verdict": "competitive",
+      "lineage": "enamel metro maps with disciplined 45° lines",
+      "thesis": "A round is a line and every hole a station; the scorecard is the route diagram you trace.",
+      "palette": ["#0B1B3A", "#FFFFFF", "#E5322D", "#2C6BE0", "#F2B705", "#2FB170"],
+      "materials": ["enamel", "porcelain station ticks", "line inks"],
+      "viewport": "The hole strip becomes the line: interchange circles for holes, your position a moving marker, scores as coloured ticks along the route.",
+      "case": "Holds product clarity on hole progression; disc golfers do not identify with a subway.",
+      "risk": "Charming for one screen, hard to carry into Stats and Settings.",
+      "comp": ".impeccable/mocks/decision/challenger-transit.webp",
+      "hero": "https://impeccable.style/worlds/cards/wayfinding-cartography-signage-midnight-transit-diagram-hero.webp"
+    },
+    {
+      "id": "challenger-cathode",
+      "label": "Struck Cathode Gauze",
+      "verdict": "competitive",
+      "lineage": "nixie numeral stacks behind bronze anode mesh",
+      "thesis": "All stroke values glow faintly at once; your score is the one struck forward, no boxes anywhere.",
+      "palette": ["#0A0F1E", "#FF7A1A", "#C58B4A", "#F3E9D8"],
+      "materials": ["cathode glow", "bronze gauze", "ghost numerals"],
+      "viewport": "Scorecard as a numeral stack per player: 1 through 7 as dim ghosts, the chosen number blazing orange.",
+      "case": "Wins clarity for score entry outright; nobody at Blair Mill identifies with a decade counter.",
+      "risk": "Orange glow on black is the opposite of sunlight legibility; the discipline is worth more than the costume.",
+      "comp": ".impeccable/mocks/decision/challenger-cathode.webp",
+      "hero": "https://impeccable.style/worlds/cards/operate-b-struck-cathode-gauze-hero.webp"
+    },
+    {
+      "id": "challenger-telop",
+      "label": "Variety Telop Captions",
+      "verdict": "declined",
+      "lineage": "Japanese variety-show outlined captions",
+      "palette": ["#FFE600", "#FF3B30", "#FFFFFF", "#111111"],
+      "materials": ["outlined type", "drop shadows"],
+      "case": "Loses both axes; scoring is not a comedy beat.",
+      "kept": "Contrast outlines on chips for sun legibility.",
+      "hero": "https://impeccable.style/worlds/cards/variety-telop-caption-field-hero.webp"
+    },
+    {
+      "id": "challenger-crane",
+      "label": "Orizuru Crane Sequence",
+      "verdict": "declined",
+      "lineage": "thirty-two numbered folds on vermilion washi",
+      "palette": ["#D8321F", "#FBEFE3", "#111111", "#C9A227"],
+      "materials": ["washi", "crease lines"],
+      "case": "Loses both axes; a round is not a fold sequence.",
+      "kept": "The strict numbered margin column.",
+      "hero": "https://impeccable.style/worlds/cards/paper-folds-pleats-deployable-orizuru-crane-sequence-hero.webp"
+    },
+    {
+      "id": "challenger-dive",
+      "label": "Mesophotic Deep Dive",
+      "verdict": "declined",
+      "lineage": "a dive profile down a volcanic wall",
+      "palette": ["#04162B", "#0E5C8A", "#7FE0F5", "#FFFFFF"],
+      "materials": ["abyssal blue", "marine snow"],
+      "case": "Loses both axes; depth has no meaning on a disc golf course.",
+      "kept": "One vertical axis ruling every line of the scorecard grid.",
+      "hero": "https://impeccable.style/worlds/cards/rivers-tides-ocean-depths-mesophotic-deep-dive-hero.webp"
+    },
+    {
+      "id": "challenger-sixpack",
+      "label": "Night Flight Six-Pack",
+      "verdict": "declined",
+      "lineage": "a small aircraft's six luminous instruments",
+      "palette": ["#0A0A0A", "#E8F0E8", "#7CFF9A", "#FFB300"],
+      "materials": ["gauge dials", "radium glow"],
+      "case": "Loses both axes; dials hide the numbers players want.",
+      "kept": "Every stat shows trend as well as value.",
+      "hero": "https://impeccable.style/worlds/cards/signals-instruments-night-flight-six-pack-hero.webp"
+    }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] },
+  "buildPath": { "value": "code", "toggle": true },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "What disc golf apps ship: white cards, rounded everything, one blue accent, executed impeccably.",
+    "palette": ["#FFFFFF", "#111827", "#2563EB", "#F59E0B"],
+    "materials": ["rounded cards", "soft shadows", "system sans"],
+    "viewport": "A list of cards under a search bar; the scorecard a card of rows.",
+    "risk": "Indistinguishable from UDisc by design.",
+    "comp": ".impeccable/mocks/decision/canon.webp"
+  },
+  "steer": true
+}

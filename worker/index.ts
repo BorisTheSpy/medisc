@@ -314,6 +314,21 @@ interface CommunityHole {
   updatedAt: number;
 }
 
+/** A named set of tees and baskets. "main" is the course's default; its holes live in `holes`, others in `layout_holes`. */
+interface CommunityLayout {
+  layoutId: string;
+  name: string;
+  holeCount: number;
+  par?: number | null;
+  distanceM?: number | null;
+  difficulty?: string | null;
+  technicality?: string | null;
+  lengthBin?: string | null;
+  playCount?: number | null;
+  updatedAt: number;
+  holes?: CommunityHole[];
+}
+
 interface CommunityCourse {
   key: string;
   name: string;
@@ -325,6 +340,10 @@ interface CommunityCourse {
   region?: string | null;
   source: string;
   updatedAt: number;
+  /** Comma-separated difficulty bins: easy, intermediate, challenging, very-challenging. */
+  difficulty?: string | null;
+  /** Average player rating out of 5. */
+  rating?: number | null;
 }
 
 const SCHEMA = [
@@ -333,6 +352,9 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS holes (course_key TEXT NOT NULL, number INTEGER NOT NULL, par INTEGER NOT NULL, distance_m INTEGER, tee_lat REAL, tee_lon REAL, basket_lat REAL, basket_lon REAL, updated_at INTEGER NOT NULL, PRIMARY KEY (course_key, number))`,
   `CREATE TABLE IF NOT EXISTS hole_history (id INTEGER PRIMARY KEY AUTOINCREMENT, course_key TEXT NOT NULL, number INTEGER NOT NULL, payload TEXT NOT NULL, updated_at INTEGER NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS hole_history_course ON hole_history (course_key, updated_at)`,
+  `CREATE TABLE IF NOT EXISTS layouts (course_key TEXT NOT NULL, layout_id TEXT NOT NULL, name TEXT NOT NULL, hole_count INTEGER NOT NULL, par INTEGER, distance_m INTEGER, difficulty TEXT, technicality TEXT, length_bin TEXT, play_count INTEGER, updated_at INTEGER NOT NULL, PRIMARY KEY (course_key, layout_id))`,
+  `CREATE TABLE IF NOT EXISTS layout_holes (course_key TEXT NOT NULL, layout_id TEXT NOT NULL, number INTEGER NOT NULL, par INTEGER NOT NULL, distance_m INTEGER, tee_lat REAL, tee_lon REAL, basket_lat REAL, basket_lon REAL, updated_at INTEGER NOT NULL, PRIMARY KEY (course_key, layout_id, number))`,
+  `CREATE TABLE IF NOT EXISTS hidden_courses (key TEXT PRIMARY KEY, name TEXT NOT NULL, lat REAL NOT NULL, lon REAL NOT NULL, reason TEXT, created_at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL, pin_hash TEXT NOT NULL, created_at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id TEXT NOT NULL, created_at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS sync_players (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, payload TEXT NOT NULL, updated_at INTEGER NOT NULL)`,
@@ -342,17 +364,27 @@ const SCHEMA = [
 ];
 let schemaReady: Promise<void> | null = null;
 /** Idempotent, runs once per isolate. Lets the Worker deploy from git without a separate migration step. */
+/** Columns added after the first release. Each ALTER fails harmlessly once the column exists. */
+const MIGRATIONS = [`ALTER TABLE courses ADD COLUMN difficulty TEXT`, `ALTER TABLE courses ADD COLUMN rating REAL`];
+
 function ensureSchema(db: D1Database): Promise<void> {
   if (!schemaReady) {
-    schemaReady = db.batch(SCHEMA.map((sql) => db.prepare(sql))).then(() => undefined).catch((err) => {
-      schemaReady = null;
-      throw err;
-    });
+    schemaReady = db
+      .batch(SCHEMA.map((sql) => db.prepare(sql)))
+      .then(async () => {
+        for (const sql of MIGRATIONS) await db.prepare(sql).run().catch(() => undefined);
+      })
+      .catch((err) => {
+        schemaReady = null;
+        throw err;
+      });
   }
   return schemaReady;
 }
 
 const KEY_RE = /^[a-zA-Z0-9_:.-]{3,120}$/;
+const LAYOUT_ID_RE = /^[a-zA-Z0-9_.-]{1,60}$/;
+const MAIN_LAYOUT = "main";
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 
 function rowToCourse(r: Record<string, unknown>): CommunityCourse {
@@ -367,7 +399,64 @@ function rowToCourse(r: Record<string, unknown>): CommunityCourse {
     region: (r.region as string | null) ?? null,
     source: String(r.source),
     updatedAt: Number(r.updated_at),
+    difficulty: (r.difficulty as string | null) ?? null,
+    rating: r.rating === null || r.rating === undefined ? null : Number(r.rating),
   };
+}
+
+function rowToLayout(r: Record<string, unknown>): CommunityLayout {
+  const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+  return {
+    layoutId: String(r.layout_id),
+    name: String(r.name),
+    holeCount: Number(r.hole_count),
+    par: num(r.par),
+    distanceM: num(r.distance_m),
+    difficulty: (r.difficulty as string | null) ?? null,
+    technicality: (r.technicality as string | null) ?? null,
+    lengthBin: (r.length_bin as string | null) ?? null,
+    playCount: num(r.play_count),
+    updatedAt: Number(r.updated_at),
+  };
+}
+
+/** Every layout of a course with its holes. Main's holes come from `holes`, the rest from `layout_holes`. */
+async function readLayouts(db: D1Database, key: string, mainHoles: CommunityHole[]): Promise<CommunityLayout[]> {
+  const [layoutRows, holeRows] = await Promise.all([
+    db.prepare("SELECT * FROM layouts WHERE course_key = ? ORDER BY play_count DESC, name").bind(key).all<Record<string, unknown>>(),
+    db.prepare("SELECT * FROM layout_holes WHERE course_key = ? ORDER BY layout_id, number").bind(key).all<Record<string, unknown>>(),
+  ]);
+  const holesByLayout = new Map<string, CommunityHole[]>();
+  for (const r of holeRows.results) {
+    const id = String(r.layout_id);
+    if (!holesByLayout.has(id)) holesByLayout.set(id, []);
+    holesByLayout.get(id)!.push(rowToHole(r));
+  }
+  return layoutRows.results.map(rowToLayout).map((l) => ({ ...l, holes: l.layoutId === MAIN_LAYOUT ? mainHoles : (holesByLayout.get(l.layoutId) ?? []) }));
+}
+
+/** Last write wins per hole; a blank never overwrites a stored pin. Same rule for the main and extra layouts. */
+function holeUpsert(db: D1Database, key: string, layoutId: string | null, h: CommunityHole, now: number): D1PreparedStatement {
+  const hPar = isNum(h.par) ? Math.max(1, Math.min(9, Math.round(h.par))) : 3;
+  const teeOk = h.tee && isNum(h.tee.lat) && isNum(h.tee.lon);
+  const basketOk = h.basket && isNum(h.basket.lat) && isNum(h.basket.lon);
+  const updatedAt = isNum(h.updatedAt) ? Math.min(h.updatedAt, now) : now;
+  const table = layoutId === null ? "holes" : "layout_holes";
+  const keyCols = layoutId === null ? "course_key, number" : "course_key, layout_id, number";
+  const keyVals = layoutId === null ? "?1, ?2" : "?1, ?10, ?2";
+  const stmt = db.prepare(
+    `INSERT INTO ${table} (${keyCols}, par, distance_m, tee_lat, tee_lon, basket_lat, basket_lon, updated_at)
+       VALUES (${keyVals}, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+       ON CONFLICT(${keyCols}) DO UPDATE SET par = excluded.par,
+         distance_m = COALESCE(excluded.distance_m, ${table}.distance_m),
+         tee_lat = COALESCE(excluded.tee_lat, ${table}.tee_lat), tee_lon = COALESCE(excluded.tee_lon, ${table}.tee_lon),
+         basket_lat = COALESCE(excluded.basket_lat, ${table}.basket_lat), basket_lon = COALESCE(excluded.basket_lon, ${table}.basket_lon),
+         updated_at = excluded.updated_at
+       WHERE excluded.updated_at >= ${table}.updated_at`,
+  );
+  const args: unknown[] = [key, Math.round(h.number), hPar, isNum(h.distanceM) ? Math.round(h.distanceM) : null, teeOk ? h.tee!.lat : null, teeOk ? h.tee!.lon : null, basketOk ? h.basket!.lat : null, basketOk ? h.basket!.lon : null, updatedAt];
+  if (layoutId !== null) args.push(layoutId);
+  return stmt.bind(...args);
 }
 
 function rowToHole(r: Record<string, unknown>): CommunityHole {
@@ -405,16 +494,24 @@ app.get("/api/community/courses", async (c) => {
   if (!hasOrigin) return c.json({ error: "lat and lon, or q, are required" }, 400);
   const dLat = radius / 111_320;
   const dLon = radius / (111_320 * Math.max(Math.cos((lat * Math.PI) / 180), 0.01));
+  // Only courses with substance are listed as community courses: created by a player, or with at least one pin.
+  // Courses that merely had pars published still serve their holes by key; they are found through the other sources.
   const { results } = await db
-    .prepare("SELECT * FROM courses WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? LIMIT 400")
+    .prepare(
+      `SELECT c.* FROM courses c WHERE c.lat BETWEEN ?1 AND ?2 AND c.lon BETWEEN ?3 AND ?4
+         AND (c.source = 'custom' OR EXISTS (SELECT 1 FROM holes h WHERE h.course_key = c.key AND (h.tee_lat IS NOT NULL OR h.basket_lat IS NOT NULL))
+              OR EXISTS (SELECT 1 FROM layout_holes h WHERE h.course_key = c.key AND (h.tee_lat IS NOT NULL OR h.basket_lat IS NOT NULL)))
+         AND NOT EXISTS (SELECT 1 FROM hidden_courses x WHERE x.key = c.key) LIMIT 400`,
+    )
     .bind(lat - dLat, lat + dLat, lon - dLon, lon + dLon)
     .all<Record<string, unknown>>();
+  const hiddenRows = await db.prepare("SELECT key, name, lat, lon FROM hidden_courses WHERE lat BETWEEN ?1 AND ?2 AND lon BETWEEN ?3 AND ?4 LIMIT 400").bind(lat - dLat, lat + dLat, lon - dLon, lon + dLon).all<{ key: string; name: string; lat: number; lon: number }>();
   const list = results
     .map(rowToCourse)
     .map((x) => ({ ...x, distanceM: haversineM(lat, lon, x.lat, x.lon) }))
     .filter((x) => x.distanceM <= radius)
     .sort((a, b) => a.distanceM - b.distanceM);
-  return c.json({ enabled: true, courses: list });
+  return c.json({ enabled: true, courses: list, hidden: hiddenRows.results });
 });
 
 app.get("/api/community/courses/:key", async (c) => {
@@ -425,7 +522,9 @@ app.get("/api/community/courses/:key", async (c) => {
   if (!KEY_RE.test(key)) return c.json({ error: "bad key" }, 400);
   const course = await db.prepare("SELECT * FROM courses WHERE key = ?").bind(key).first<Record<string, unknown>>();
   const { results } = await db.prepare("SELECT * FROM holes WHERE course_key = ? ORDER BY number").bind(key).all<Record<string, unknown>>();
-  return c.json({ enabled: true, course: course ? rowToCourse(course) : null, holes: results.map(rowToHole) }, 200, { "Cache-Control": "no-store" });
+  const holes = results.map(rowToHole);
+  const layouts = await readLayouts(db, key, holes);
+  return c.json({ enabled: true, course: course ? rowToCourse(course) : null, holes, layouts }, 200, { "Cache-Control": "no-store" });
 });
 
 app.put("/api/community/courses/:key", async (c) => {
@@ -434,7 +533,7 @@ app.put("/api/community/courses/:key", async (c) => {
   await ensureSchema(db);
   const key = c.req.param("key");
   if (!KEY_RE.test(key)) return c.json({ error: "bad key" }, 400);
-  let body: { course?: Partial<CommunityCourse>; holes?: CommunityHole[] };
+  let body: { course?: Partial<CommunityCourse>; holes?: CommunityHole[]; layouts?: CommunityLayout[] };
   try {
     body = await c.req.json();
   } catch {
@@ -442,10 +541,11 @@ app.put("/api/community/courses/:key", async (c) => {
   }
   const course = body.course;
   const holes = Array.isArray(body.holes) ? body.holes : [];
+  const layouts = (Array.isArray(body.layouts) ? body.layouts : []).filter((l) => l && typeof l.layoutId === "string" && LAYOUT_ID_RE.test(l.layoutId) && typeof l.name === "string" && l.name.trim());
   if (!course || typeof course.name !== "string" || !course.name.trim() || !isNum(course.lat) || !isNum(course.lon)) {
     return c.json({ error: "course needs name, lat and lon" }, 400);
   }
-  if (holes.length > 40) return c.json({ error: "too many holes" }, 400);
+  if (holes.length > 40 || layouts.length > 12 || layouts.some((l) => (l.holes?.length ?? 0) > 40)) return c.json({ error: "too many holes" }, 400);
   const now = Date.now();
   const name = course.name.trim().slice(0, 120);
   const holeCount = Math.max(holes.length, isNum(course.holeCount) ? Math.round(course.holeCount) : 0, 1);
@@ -454,40 +554,93 @@ app.put("/api/community/courses/:key", async (c) => {
   const statements: D1PreparedStatement[] = [
     db
       .prepare(
-        `INSERT INTO courses (key, name, lat, lon, hole_count, par, city, region, source, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)
+        `INSERT INTO courses (key, name, lat, lon, hole_count, par, city, region, source, created_at, updated_at, difficulty, rating)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10, ?11, ?12)
          ON CONFLICT(key) DO UPDATE SET name = excluded.name, lat = excluded.lat, lon = excluded.lon, hole_count = excluded.hole_count,
-           par = excluded.par, city = COALESCE(excluded.city, courses.city), region = COALESCE(excluded.region, courses.region), updated_at = excluded.updated_at`,
+           par = excluded.par, city = COALESCE(excluded.city, courses.city), region = COALESCE(excluded.region, courses.region), updated_at = excluded.updated_at,
+           difficulty = COALESCE(excluded.difficulty, courses.difficulty), rating = COALESCE(excluded.rating, courses.rating)`,
       )
-      .bind(key, name, course.lat, course.lon, holeCount, par, course.city ?? null, course.region ?? null, String(course.source ?? "custom").slice(0, 20), now),
+      .bind(
+        key,
+        name,
+        course.lat,
+        course.lon,
+        holeCount,
+        par,
+        course.city ?? null,
+        course.region ?? null,
+        String(course.source ?? "custom").slice(0, 20),
+        now,
+        typeof course.difficulty === "string" && course.difficulty ? course.difficulty.slice(0, 80) : null,
+        isNum(course.rating) ? Math.round(course.rating * 100) / 100 : null,
+      ),
   ];
   for (const h of holes) {
     if (!isNum(h.number) || h.number < 1 || h.number > 40) continue;
-    const hPar = isNum(h.par) ? Math.max(1, Math.min(9, Math.round(h.par))) : 3;
-    const teeOk = h.tee && isNum(h.tee.lat) && isNum(h.tee.lon);
-    const basketOk = h.basket && isNum(h.basket.lat) && isNum(h.basket.lon);
-    const updatedAt = isNum(h.updatedAt) ? Math.min(h.updatedAt, now) : now;
-    // Last write wins: only overwrite if this edit is newer than what is stored.
+    statements.push(holeUpsert(db, key, null, h, now));
+    statements.push(db.prepare("INSERT INTO hole_history (course_key, number, payload, updated_at) VALUES (?1, ?2, ?3, ?4)").bind(key, Math.round(h.number), JSON.stringify(h).slice(0, 2000), isNum(h.updatedAt) ? Math.min(h.updatedAt, now) : now));
+  }
+  if (holes.length > 0) statements.push(db.prepare("DELETE FROM holes WHERE course_key = ?1 AND number > ?2").bind(key, holes.length));
+
+  // Layout metadata for every layout, main included; holes only for the extra layouts (main's are above).
+  for (const l of layouts) {
+    const lHoles = l.layoutId === MAIN_LAYOUT ? [] : (Array.isArray(l.holes) ? l.holes : []).filter((h) => isNum(h.number) && h.number >= 1 && h.number <= 40);
+    const lPar = lHoles.length ? lHoles.reduce((a, h) => a + (isNum(h.par) ? h.par : 3), 0) : isNum(l.par) ? l.par : null;
+    const lCount = Math.max(lHoles.length, isNum(l.holeCount) ? Math.round(l.holeCount) : 0, 1);
+    const lUpdated = isNum(l.updatedAt) ? Math.min(l.updatedAt, now) : now;
     statements.push(
       db
         .prepare(
-          `INSERT INTO holes (course_key, number, par, distance_m, tee_lat, tee_lon, basket_lat, basket_lon, updated_at)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-           ON CONFLICT(course_key, number) DO UPDATE SET par = excluded.par,
-             distance_m = COALESCE(excluded.distance_m, holes.distance_m),
-             tee_lat = COALESCE(excluded.tee_lat, holes.tee_lat), tee_lon = COALESCE(excluded.tee_lon, holes.tee_lon),
-             basket_lat = COALESCE(excluded.basket_lat, holes.basket_lat), basket_lon = COALESCE(excluded.basket_lon, holes.basket_lon),
-             updated_at = excluded.updated_at
-           WHERE excluded.updated_at >= holes.updated_at`,
+          `INSERT INTO layouts (course_key, layout_id, name, hole_count, par, distance_m, difficulty, technicality, length_bin, play_count, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+           ON CONFLICT(course_key, layout_id) DO UPDATE SET name = excluded.name, hole_count = excluded.hole_count, par = COALESCE(excluded.par, layouts.par),
+             distance_m = COALESCE(excluded.distance_m, layouts.distance_m), difficulty = COALESCE(excluded.difficulty, layouts.difficulty),
+             technicality = COALESCE(excluded.technicality, layouts.technicality), length_bin = COALESCE(excluded.length_bin, layouts.length_bin),
+             play_count = COALESCE(excluded.play_count, layouts.play_count), updated_at = excluded.updated_at
+           WHERE excluded.updated_at >= layouts.updated_at`,
         )
-        .bind(key, Math.round(h.number), hPar, isNum(h.distanceM) ? Math.round(h.distanceM) : null, teeOk ? h.tee!.lat : null, teeOk ? h.tee!.lon : null, basketOk ? h.basket!.lat : null, basketOk ? h.basket!.lon : null, updatedAt),
+        .bind(
+          key,
+          l.layoutId,
+          l.name.trim().slice(0, 80),
+          lCount,
+          lPar,
+          isNum(l.distanceM) ? Math.round(l.distanceM) : null,
+          typeof l.difficulty === "string" && l.difficulty ? l.difficulty.slice(0, 40) : null,
+          typeof l.technicality === "string" && l.technicality ? l.technicality.slice(0, 40) : null,
+          typeof l.lengthBin === "string" && l.lengthBin ? l.lengthBin.slice(0, 40) : null,
+          isNum(l.playCount) ? Math.round(l.playCount) : null,
+          lUpdated,
+        ),
     );
-    statements.push(db.prepare("INSERT INTO hole_history (course_key, number, payload, updated_at) VALUES (?1, ?2, ?3, ?4)").bind(key, Math.round(h.number), JSON.stringify(h).slice(0, 2000), updatedAt));
+    for (const h of lHoles) statements.push(holeUpsert(db, key, l.layoutId, h, now));
+    if (lHoles.length > 0) statements.push(db.prepare("DELETE FROM layout_holes WHERE course_key = ?1 AND layout_id = ?2 AND number > ?3").bind(key, l.layoutId, lHoles.length));
   }
-  if (holes.length > 0) statements.push(db.prepare("DELETE FROM holes WHERE course_key = ?1 AND number > ?2").bind(key, holes.length));
   await db.batch(statements);
   const { results } = await db.prepare("SELECT * FROM holes WHERE course_key = ? ORDER BY number").bind(key).all<Record<string, unknown>>();
-  return c.json({ enabled: true, holes: results.map(rowToHole) });
+  const saved = results.map(rowToHole);
+  return c.json({ enabled: true, holes: saved, layouts: await readLayouts(db, key, saved) });
+});
+
+/** A player says there is no disc golf here: hide the course for everyone. Reversible with unhide. */
+app.post("/api/community/courses/:key/hide", async (c) => {
+  const db = c.env.DB;
+  if (!db) return c.json({ enabled: false }, 503);
+  await ensureSchema(db);
+  const key = c.req.param("key");
+  if (!KEY_RE.test(key)) return c.json({ error: "bad key" }, 400);
+  const body = await c.req.json<{ name?: string; lat?: number; lon?: number; reason?: string; unhide?: boolean }>().catch(() => ({}) as { name?: string; lat?: number; lon?: number; reason?: string; unhide?: boolean });
+  if (body.unhide) {
+    await db.prepare("DELETE FROM hidden_courses WHERE key = ?").bind(key).run();
+    return c.json({ enabled: true, hidden: false });
+  }
+  const existing = await db.prepare("SELECT name, lat, lon FROM courses WHERE key = ?").bind(key).first<{ name: string; lat: number; lon: number }>();
+  const name = String(body.name ?? existing?.name ?? "").slice(0, 120);
+  const lat = isNum(body.lat) ? body.lat : existing?.lat;
+  const lon = isNum(body.lon) ? body.lon : existing?.lon;
+  if (!name || !isNum(lat) || !isNum(lon)) return c.json({ error: "name, lat and lon are required" }, 400);
+  await db.prepare("INSERT OR REPLACE INTO hidden_courses (key, name, lat, lon, reason, created_at) VALUES (?, ?, ?, ?, ?, ?)").bind(key, name, lat, lon, String(body.reason ?? "no disc golf here").slice(0, 200), Date.now()).run();
+  return c.json({ enabled: true, hidden: true });
 });
 
 /** Restore pins from history: for each hole, re-apply the most recent recorded tee and basket. */

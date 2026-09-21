@@ -6,7 +6,7 @@ import { fetchNearbyCourses, searchCoursesByName } from "@/services/overpass";
 import { searchPlace, type Place } from "@/services/nominatim";
 import { mergeCourseLists, type NearbyCourse } from "@/domain/osm";
 import type { LatLon } from "@/domain/types";
-import { formatTravelDistance, haversineM, type Units } from "@/domain/geo";
+import { formatTravelDistance, haversineM, type Units, formatDifficulty } from "@/domain/geo";
 import { upsertCourse, getSetting, setSetting } from "@/db/repo";
 import { useCourses, useSetting } from "@/db/hooks";
 import { Button, EmptyState, Field, IconButton, PageHeader, Segmented, Spinner, cx } from "@/components/ui";
@@ -407,6 +407,7 @@ export function CoursesRoute() {
                     <div className="truncate font-bold">{selected.name}</div>
                     <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-ink-3">
                       <span>{selected.holeCount} holes</span>
+                      {formatDifficulty(selected.difficulty) && <span>{formatDifficulty(selected.difficulty)}</span>}
                       {selected.par && <span>par {selected.par}</span>}
                       {(selected.city || selected.region) && <span>{[selected.city, selected.region].filter(Boolean).join(", ")}</span>}
                       {selected.distanceM !== undefined && <span>{formatTravelDistance(selected.distanceM, units)} away</span>}
@@ -467,7 +468,7 @@ export function CoursesRoute() {
           )}
           {merged.length > 0 && <CourseList courses={merged} units={units} onOpen={open} />}
           {courses && (
-            <p className="mt-3 text-center text-[11px] text-ink-3">
+            <p className="mt-3 pb-24 text-center text-[11px] text-ink-3">
               Course data © OpenStreetMap contributors. Course data supplied by DiscGolfAPI.{merged.some((c) => c.source === "places") ? " Powered by Google." : ""}
             </p>
           )}
@@ -476,9 +477,9 @@ export function CoursesRoute() {
 
       <div className={cx("pointer-events-none fixed inset-x-0 bottom-20 z-20 flex justify-center px-4", view === "map" && !showingSearch && "hidden")} style={{ marginBottom: "env(safe-area-inset-bottom)" }}>
         <div className="flex w-full max-w-[448px] justify-end">
-          <button onClick={() => nav("/courses/new")} className="pointer-events-auto flex h-14 items-center gap-2 rounded-full bg-accent px-5 font-bold text-accent-ink shadow-card">
-            <Plus size={20} /> Add course
-          </button>
+          <Button variant="primary" size="lg" onClick={() => nav("/courses/new")} className="pointer-events-auto">
+            <Plus size={18} /> Add course
+          </Button>
         </div>
       </div>
     </div>
@@ -494,6 +495,7 @@ function CourseList({ courses, units, onOpen }: { courses: NearbyCourse[]; units
             <div className="truncate font-semibold">{c.name}</div>
             <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-ink-3">
               <span>{c.holeCount} holes</span>
+              {formatDifficulty(c.difficulty) && <span>{formatDifficulty(c.difficulty)}</span>}
               {c.par && <span>par {c.par}</span>}
               {(c.city || c.region) && <span>{[c.city, c.region].filter(Boolean).join(", ")}</span>}
               {c.fee === "yes" && <span>pay to play</span>}

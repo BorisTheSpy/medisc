@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Map as MapIcon, MoreHorizontal, Minus, Plus,
 import { useCourse, useHoles, usePlayers, useRound, useRoundScores, useSetting } from "@/db/hooks";
 import { addPlayerToRound, adjustStrokes, createPlayer, deleteRound, finishRound, removePlayerFromRound, setHolePar, setSetting, setThrows, updateHole, removeHole, setHoleCount } from "@/db/repo";
 import { publishCourseNow } from "@/services/community";
+import { roundLayoutId } from "@/domain/layouts";
 import { useGeolocation } from "@/services/useGeolocation";
 import { formatHoleDistance, haversineM, type Units } from "@/domain/geo";
 import { formatToPar, roundTotals, scoreLabel, isHoledOut } from "@/domain/scoring";
@@ -24,6 +25,10 @@ function formatAccuracyFt(m: number): number {
   return m * 3.28084;
 }
 
+/** A pin is only saved when the phone reports a fix at least this good. */
+const MAX_PIN_ACCURACY_FT = 15;
+const MAX_PIN_ACCURACY_M = MAX_PIN_ACCURACY_FT / 3.28084;
+
 function holeKey(roundId: string) {
   return `medisc.hole.${roundId}`;
 }
@@ -35,7 +40,8 @@ export function ScorecardRoute() {
   const scores = useRoundScores(id);
   const players = usePlayers();
   const course = useCourse(round?.courseId);
-  const holes = useHoles(round?.courseId);
+  const layoutId = roundLayoutId(round);
+  const holes = useHoles(round?.courseId, layoutId);
   const units = useSetting<Units>("units", "ft");
   const satellite = useSetting<boolean>("satellite", false);
   const geo = useGeolocation(true);
@@ -81,11 +87,11 @@ export function ScorecardRoute() {
       notify("Waiting for a GPS fix. Try again in a moment.");
       return;
     }
-    if (pos.accuracy > 25) {
-      notify(`GPS accuracy is ±${Math.round(formatAccuracyFt(pos.accuracy))} ft. Stand still for a few seconds and tap again.`);
+    if (pos.accuracy > MAX_PIN_ACCURACY_M) {
+      notify(`GPS accuracy is ±${Math.round(formatAccuracyFt(pos.accuracy))} ft. Pins need ±${MAX_PIN_ACCURACY_FT} ft or better. Stand still in the open for a few seconds and tap again.`);
       return;
     }
-    const existing = hole ?? { id: `${course.id}-${holeNumber}`, courseId: course.id, number: holeNumber, par, updatedAt: Date.now() };
+    const existing = hole ?? { id: `${course.id}-${holeNumber}`, courseId: course.id, layoutId, number: holeNumber, par, updatedAt: Date.now() };
     const next = { ...existing, [what]: { lat: pos.lat, lon: pos.lon }, par: existing.par || par };
     if (next.tee && next.basket) {
       next.distanceM = Math.round(haversineM(next.tee, next.basket));
@@ -169,74 +175,80 @@ export function ScorecardRoute() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
-      <header className="safe-top sticky top-0 z-20 bg-brand text-brand-ink">
-        <div className="flex h-14 items-center px-2">
-          <IconButton label="Leave scorecard" onClick={() => nav("/")} className="text-brand-ink hover:bg-brand-2">
+      <header className="safe-top sticky top-0 z-20 bg-bg">
+        <div className="flex h-14 items-center px-[11px]">
+          <IconButton label="Leave scorecard" onClick={() => nav("/")}>
             <ChevronLeft size={24} />
           </IconButton>
           <div className="min-w-0 flex-1 px-1">
-            <div className="truncate text-sm font-semibold">{round.courseName}</div>
-            <div className="text-[11px] text-brand-ink/70">
+            <div className="truncate text-[14px] font-extrabold">
+              {round.courseName}
+              {round.layoutName && <span className="font-semibold text-ink-3"> · {round.layoutName}</span>}
+            </div>
+            <div className="label mt-1 text-ink-3">
               {holesComplete.size} of {order.length} holes scored
             </div>
           </div>
-          <IconButton label={showMap ? "Hide map" : "Show map"} onClick={() => setShowMap((v) => !v)} className={cx("text-brand-ink hover:bg-brand-2", showMap && "bg-brand-2")}>
+          <IconButton label={showMap ? "Hide map" : "Show map"} onClick={() => setShowMap((v) => !v)} className={cx(showMap && "bg-surface-2 text-lime")}>
             <MapIcon size={22} />
           </IconButton>
-          <IconButton label="Round options" onClick={() => setMenuOpen(true)} className="text-brand-ink hover:bg-brand-2">
+          <IconButton label="Round options" onClick={() => setMenuOpen(true)}>
             <MoreHorizontal size={24} />
           </IconButton>
         </div>
 
-        <div className="flex items-end justify-between px-5 pb-4 pt-1">
-          <div>
-            <div className="text-[13px] font-medium text-brand-ink/70">Hole</div>
-            <div className="display text-[64px] leading-none">{holeNumber ?? "–"}</div>
-          </div>
-          <div className="flex gap-5 pb-1 text-right">
+        {/* Hole overlay: the lime timing bar. */}
+        <div key={holeNumber} className="overlay-in mx-[11px] rounded-[14px] bg-lime px-[22px] pb-[15px] pt-[11px] text-on-lime">
+          <div className="flex items-end justify-between gap-[11px]">
             <div>
-              <div className="text-[13px] font-medium text-brand-ink/70">Par</div>
-              <div className="display numeric text-[34px]">{par}</div>
+              <div className="label">Hole</div>
+              <div className="display text-[84px] leading-[0.8]">{holeNumber ?? "–"}</div>
             </div>
-            {hole?.distanceM ? (
+            <div className="flex gap-[22px] pb-1 text-right">
               <div>
-                <div className="text-[13px] font-medium text-brand-ink/70">Length</div>
-                <div className="display numeric text-[34px]">{formatHoleDistance(hole.distanceM, units)}</div>
+                <div className="label">Par</div>
+                <div className="display numeric mt-1 text-[36px]">{par}</div>
               </div>
-            ) : null}
-            <div>
-              <div className="flex items-center justify-end gap-1 text-[13px] font-medium text-brand-ink/70">
-                <Crosshair size={12} /> To basket
+              {hole?.distanceM ? (
+                <div>
+                  <div className="label">Length</div>
+                  <div className="display numeric mt-1 text-[36px]">{formatHoleDistance(hole.distanceM, units)}</div>
+                </div>
+              ) : null}
+              <div>
+                <div className="label flex items-center justify-end gap-1">
+                  <Crosshair size={11} /> Basket
+                </div>
+                <div className={cx("display numeric mt-1 text-[36px]", distanceToBasket === null && "opacity-40")}>{distanceToBasket !== null ? formatHoleDistance(distanceToBasket, units) : "–"}</div>
               </div>
-              <div className={cx("display numeric text-[34px]", distanceToBasket === null && "text-brand-ink/40")}>{distanceToBasket !== null ? formatHoleDistance(distanceToBasket, units) : "–"}</div>
             </div>
           </div>
+          <div className="mt-[11px] flex items-center gap-2">
+            <button
+              onClick={() => markHere("tee")}
+              className={cx("label flex h-8 items-center gap-1 rounded-[39px] border-2 border-on-lime px-3 uppercase", hole?.tee ? "bg-on-lime text-lime" : "bg-transparent text-on-lime")}
+              aria-label={hole?.tee ? "Re-mark tee at my position" : "Mark tee at my position"}
+            >
+              <Crosshair size={12} /> {hole?.tee ? "Tee set" : "Tee here"}
+            </button>
+            <button
+              onClick={() => markHere("basket")}
+              className={cx("label flex h-8 items-center gap-1 rounded-[39px] border-2 border-on-lime px-3 uppercase", hole?.basket ? "bg-on-lime text-lime" : "bg-transparent text-on-lime")}
+              aria-label={hole?.basket ? "Re-mark basket at my position" : "Mark basket at my position"}
+            >
+              <Crosshair size={12} /> {hole?.basket ? "Basket set" : "Basket here"}
+            </button>
+            <span className="label ml-auto opacity-70">{geo.position ? `GPS ±${Math.round(formatAccuracyFt(geo.position.accuracy))} ft` : "No GPS"}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-2 px-4 pb-2">
-          <button
-            onClick={() => markHere("tee")}
-            className={cx("flex h-8 items-center gap-1 rounded-full px-3 text-xs font-semibold", hole?.tee ? "bg-brand-2 text-brand-ink" : "bg-accent text-accent-ink")}
-            aria-label={hole?.tee ? "Re-mark tee at my position" : "Mark tee at my position"}
-          >
-            <Crosshair size={12} /> {hole?.tee ? "Tee set" : "Tee here"}
-          </button>
-          <button
-            onClick={() => markHere("basket")}
-            className={cx("flex h-8 items-center gap-1 rounded-full px-3 text-xs font-semibold", hole?.basket ? "bg-brand-2 text-brand-ink" : "bg-accent text-accent-ink")}
-            aria-label={hole?.basket ? "Re-mark basket at my position" : "Mark basket at my position"}
-          >
-            <Crosshair size={12} /> {hole?.basket ? "Basket set" : "Basket here"}
-          </button>
-          <span className="ml-auto text-[11px] text-brand-ink/60">{geo.position ? `GPS ±${Math.round(formatAccuracyFt(geo.position.accuracy))} ft` : "No GPS yet"}</span>
-        </div>
-        <div className="flex gap-1.5 overflow-x-auto px-4 pb-3 [scrollbar-width:none]">
+        <div className="flex gap-[6px] overflow-x-auto px-[11px] py-[11px] [scrollbar-width:none]">
           {order.map((n, i) => (
             <button
               key={n}
               onClick={() => setIdx(i)}
               className={cx(
-                "numeric h-8 w-8 shrink-0 rounded-full text-sm font-bold",
-                i === idx ? "bg-accent text-accent-ink" : holesComplete.has(n) ? "bg-brand-2 text-brand-ink" : "bg-brand-2/50 text-brand-ink/60",
+                "numeric h-8 w-8 shrink-0 rounded-full border-2 text-[12px] font-extrabold transition-colors duration-150 ease",
+                i === idx ? "border-lime bg-lime text-on-lime" : holesComplete.has(n) ? "border-lime bg-transparent text-lime" : "border-line-strong bg-transparent text-ink-3",
               )}
               aria-current={i === idx ? "step" : undefined}
             >
@@ -252,51 +264,51 @@ export function ScorecardRoute() {
         </CourseMap>
       )}
 
-      <div className="flex-1 px-3 pt-3 pb-32">
-        <div className="overflow-hidden rounded-card bg-surface shadow-card">
+      <div className="flex-1 px-[11px] pt-[11px] pb-32">
+        <div className="overflow-hidden rounded-[14px] bg-surface">
           {cardPlayers.map((p) => {
             const s = holeScores.find((x) => x.playerId === p.id);
             const t = totals.get(p.id);
             if (!s) return null;
             const label = scoreLabel(s.strokes, s.par);
             return (
-              <div key={p.id} className="flex items-center gap-2 border-b hairline px-3 py-2.5 last:border-b-0">
+              <div key={p.id} className="flex items-center gap-2 border-b hairline px-[11px] py-[11px] last:border-b-0">
                 <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => round.trackThrows && setTrackerFor(p.id)} aria-label={round.trackThrows ? `Track throws for ${p.name}` : p.name}>
                   <Avatar name={p.name} color={p.color} size={38} />
                   <div className="min-w-0">
-                    <div className="truncate font-semibold">{p.name}</div>
-                    <div className="numeric text-xs text-ink-3">
+                    <div className="truncate text-[15px] font-extrabold">{p.name}</div>
+                    <div className="label numeric mt-1.5 text-ink-3">
                       {t && t.holesScored > 0 ? (
                         <>
-                          <span className={cx("font-bold", t.toPar < 0 ? "text-birdie" : t.toPar > 0 ? "text-triple" : "text-ink-2")}>{formatToPar(t.toPar)}</span> · {t.strokes} after {t.holesScored}
+                          <span className={cx(t.toPar < 0 ? "text-lime" : t.toPar > 0 ? "text-ink" : "text-ink-2")}>{formatToPar(t.toPar)}</span> · {t.strokes} after {t.holesScored}
                         </>
                       ) : (
                         "no holes yet"
                       )}
-                      {round.trackThrows && s.throws && s.throws.length > 0 && <span className="ml-1 text-birdie">· {s.throws.length} throws logged</span>}
+                      {round.trackThrows && s.throws && s.throws.length > 0 && <span className="ml-1 text-lime">· {s.throws.length} throws</span>}
                     </div>
                   </div>
                 </button>
-                <button aria-label={`Remove a stroke for ${p.name}`} onClick={() => adjustStrokes(s.id, -1)} disabled={s.strokes === 1} className="grid h-12 w-12 place-items-center rounded-full bg-surface-2 text-ink active:bg-surface-3 disabled:opacity-30">
-                  <Minus size={22} />
+                <button aria-label={`Remove a stroke for ${p.name}`} onClick={() => adjustStrokes(s.id, -1)} disabled={s.strokes === 1} className="grid h-12 w-12 place-items-center rounded-full border-2 border-ink text-ink active:bg-surface-3 disabled:opacity-30">
+                  <Minus size={22} strokeWidth={2.6} />
                 </button>
-                <div className={cx("display numeric w-12 text-center text-[36px]", label === "birdie" || label === "eagle" || label === "ace" ? "text-birdie" : label === "bogey" || label === "double" || label === "triple" ? "text-triple" : "")} aria-live="polite" aria-label={`${p.name} strokes`}>
+                <div key={`${s.id}-${s.strokes}`} className={cx("display numeric strike w-14 text-center text-[44px]", label === "birdie" || label === "eagle" || label === "ace" ? "text-lime" : label === "double" || label === "triple" ? "text-triple" : "text-ink")} aria-live="polite" aria-label={`${p.name} strokes`}>
                   {s.strokes > 0 ? s.strokes : "–"}
                 </div>
-                <button aria-label={`Add a stroke for ${p.name}`} onClick={() => adjustStrokes(s.id, 1)} className="grid h-12 w-12 place-items-center rounded-full bg-accent text-accent-ink active:bg-accent-2">
-                  <Plus size={22} />
+                <button aria-label={`Add a stroke for ${p.name}`} onClick={() => adjustStrokes(s.id, 1)} className="grid h-12 w-12 place-items-center rounded-full bg-lime text-on-lime active:bg-lime-2">
+                  <Plus size={22} strokeWidth={2.6} />
                 </button>
               </div>
             );
           })}
         </div>
-        <p className="mt-2 px-1 text-xs text-ink-3">
+        <p className="label mt-[11px] px-[11px] normal-case text-ink-3">
           {round.trackThrows ? "Tap a name to log where each throw landed. " : ""}On a new hole, + sets par and − sets a birdie. Then each tap moves one stroke.
         </p>
       </div>
 
-      <div className="safe-bottom fixed inset-x-0 bottom-0 z-20 flex justify-center border-t hairline bg-surface/95 backdrop-blur">
-        <div className="flex w-full max-w-[480px] items-center gap-2 px-3 py-3">
+      <div className="safe-bottom fixed inset-x-0 bottom-0 z-20 flex justify-center border-t border-lime/30 bg-surface">
+        <div className="flex w-full max-w-[480px] items-center gap-2 px-[11px] py-[11px]">
           <Button size="lg" onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0} aria-label="Previous hole" className="w-14 px-0">
             <ChevronLeft size={24} />
           </Button>
@@ -305,7 +317,7 @@ export function ScorecardRoute() {
               <Flag size={18} /> Finish round
             </Button>
           ) : (
-            <Button variant="brand" size="lg" className="flex-1" onClick={() => setIdx((i) => Math.min(order.length - 1, i + 1))}>
+            <Button variant="primary" size="lg" className="flex-1" onClick={() => setIdx((i) => Math.min(order.length - 1, i + 1))}>
               Next hole <ChevronRight size={20} />
             </Button>
           )}
@@ -336,7 +348,7 @@ export function ScorecardRoute() {
                 await setHolePar(round.id, holeNumber, p);
                 setParOpen(false);
               }}
-              className={cx("display numeric h-14 w-14 rounded-full text-2xl", p === par ? "bg-brand text-brand-ink" : "bg-surface-2")}
+              className={cx("display numeric h-14 w-14 rounded-full text-2xl border-2", p === par ? "border-lime bg-lime text-on-lime" : "border-line-strong bg-transparent text-ink")}
             >
               {p}
             </button>
@@ -430,7 +442,7 @@ export function ScorecardRoute() {
       </Sheet>
 
       <Sheet open={holesOpen} onClose={() => setHolesOpen(false)} title="Fix this course's holes">
-        <p className="text-sm text-ink-2">Course data is often wrong about hole counts. Changes here apply to the course for everyone and to this round.</p>
+        <p className="text-sm text-ink-2">Course data is often wrong about hole counts. Changes here apply to {round.layoutName ? `the ${round.layoutName} layout` : "the course"} for everyone and to this round.</p>
         <div className="mt-4 rounded-card bg-surface-2 p-3">
           <div className="text-sm font-semibold">Remove hole {holeNumber}</div>
           <p className="mt-1 text-xs text-ink-3">Later holes move up one number.</p>
@@ -441,7 +453,7 @@ export function ScorecardRoute() {
             disabled={holes.length <= 1}
             onClick={async () => {
               if (!course) return;
-              await removeHole(course.id, holeNumber);
+              await removeHole(course.id, holeNumber, layoutId);
               await publishCourseNow(course.id);
               setHolesOpen(false);
               setIdx((i) => Math.min(i, Math.max(0, order.length - 2)));
@@ -458,7 +470,7 @@ export function ScorecardRoute() {
             if (!course) return;
             const n = Number(holeCountInput);
             if (!Number.isFinite(n) || n < 1 || n > 36) return;
-            await setHoleCount(course.id, n);
+            await setHoleCount(course.id, n, layoutId);
             await publishCourseNow(course.id);
             setHolesOpen(false);
             setIdx((i) => Math.min(i, Math.max(0, n - 1)));
@@ -528,12 +540,12 @@ function ThrowTracker({ score, par, onDone }: { score: HoleScore; par: number; o
       {!holed && (
         <div className="mt-4 grid grid-cols-2 gap-2">
           {ZONES.map((z) => (
-            <button key={z.zone} onClick={() => add(z.zone)} className={cx("rounded-card px-3 py-3 text-left active:bg-surface-3", z.zone === "ob" ? "bg-danger/10" : "bg-surface-2")}>
+            <button key={z.zone} onClick={() => add(z.zone)} className={cx("rounded-[6px] border px-3 py-3 text-left active:bg-surface-3", z.zone === "ob" ? "border-danger bg-transparent" : "border-line-strong bg-surface-2")}>
               <div className="font-semibold">{z.label}</div>
               <div className="text-[11px] text-ink-3">{z.hint}</div>
             </button>
           ))}
-          <button onClick={() => add("basket")} className="col-span-2 rounded-card bg-ace px-3 py-4 text-center text-lg font-bold text-white active:opacity-90">
+          <button onClick={() => add("basket")} className="label col-span-2 rounded-[39px] bg-lime px-3 py-[15px] text-center text-[14px] uppercase text-on-lime active:bg-lime-2">
             In the basket
           </button>
         </div>

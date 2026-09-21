@@ -24,7 +24,7 @@ export function AppShell() {
   if (dbOk === false) {
     return (
       <div className="mx-auto max-w-[480px] p-6 text-center">
-        <h1 className="text-xl font-bold">Storage is blocked</h1>
+        <h1 className="display text-[30px]">Storage is blocked</h1>
         <p className="mt-2 text-sm text-ink-2">Medisc keeps your rounds on this device. Private browsing or blocked site data prevents that. Open the app in a normal window.</p>
       </div>
     );

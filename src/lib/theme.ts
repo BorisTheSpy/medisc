@@ -1,29 +1,15 @@
-export type ThemePref = "system" | "light" | "dark";
-const KEY = "medisc.theme";
+/** The visual system is dark only; theme preference is kept for compatibility but always resolves to dark. */
+export type ThemePref = "dark";
 
 export function getThemePref(): ThemePref {
-  try {
-    const v = localStorage.getItem(KEY);
-    if (v === "light" || v === "dark" || v === "system") return v;
-  } catch {
-    /* private mode */
-  }
-  return "system";
+  return "dark";
 }
 
-export function applyTheme(pref: ThemePref): void {
-  const root = document.documentElement;
-  if (pref === "system") root.removeAttribute("data-theme");
-  else root.setAttribute("data-theme", pref);
-  const dark = pref === "dark" || (pref === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#0e1b2e" : "#1b3f7a");
-  try {
-    localStorage.setItem(KEY, pref);
-  } catch {
-    /* ignore */
-  }
+export function applyTheme(_pref?: ThemePref): void {
+  document.documentElement.setAttribute("data-theme", "dark");
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#3b3c38");
 }
 
 export function applyStoredTheme(): void {
-  applyTheme(getThemePref());
+  applyTheme();
 }

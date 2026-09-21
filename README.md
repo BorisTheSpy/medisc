@@ -65,7 +65,15 @@ bunx wrangler d1 migrations apply medisc --remote   # production
 
 Without the binding the app still works; layouts just stay on the device.
 
-While playing, the scorecard has "Tee here" and "Basket here" buttons that save your GPS position for the current hole and publish it. The course editor does the same by tapping the map.
+While playing, the scorecard has "Tee here" and "Basket here" buttons that save your GPS position for the current hole and publish it. A pin is only saved when the phone reports a fix of ±15 ft or better; otherwise the app asks you to stand still and tap again. The course editor does the same by tapping the map.
+
+### Layouts (shorts and longs)
+
+A course can have more than one layout: "Long" and "Short", "Mane" and "Pony", "Blue tees". Every course has a main layout; imported courses may carry more. Pick one on the course page or when starting a round, and the scorecard, pins, pars and hole-count fixes all apply to that layout. Rounds remember which layout they were played on.
+
+- On the device, holes carry a `layoutId` (`main` by default) and layout metadata lives in a `layouts` table.
+- In D1, `holes` holds the main layout, `layout_holes` the others, and `layouts` the metadata (name, hole count, par, length, UDisc length/difficulty/technicality bins, 30-day play count). `GET /api/community/courses/:key` returns `layouts[]` with holes; `PUT` accepts `layouts[]` alongside `holes`.
+- Players cannot create or delete layouts in the app yet; they edit the ones a course has.
 
 ## Optional: Google Places for better coverage
 
@@ -84,6 +92,23 @@ Without the key the app works exactly as before.
 - Basemap: OpenFreeMap (OpenMapTiles). Satellite imagery: Esri World Imagery and partners, for non-commercial use.
 - Place search: Nominatim.
 - Optional: Google Places (New) for course locations when a key is configured.
+
+### How the sources are combined
+
+- A Google Places result is kept only when its name says disc golf, or when a course from another source anchors it (within 300 m, or within 1 km with a shared name word). Google returns plain parks near any "disc golf" search, so unanchored parks are dropped.
+- Two records from the same source never merge into each other, so a park with two courses (Nevin Park and Nevin Daydream, Reedy Creek 1–9 and the 18) keeps both.
+- The community list only carries courses a player created or pinned. Opening a course no longer publishes it; a course is published once it has a pin, an edited layout, a rename, or was created in the app.
+- "Not a disc golf course? Report it" on a course page hides that place for everyone (table `hidden_courses`). Undo with `POST /api/community/courses/:key/hide` and body `{"unhide": true}`.
+
+### Importing from UDisc
+
+With UDisc's permission, `scripts/import-udisc.ts` reads the courses closest to a point and writes every active layout (pars, lengths, tee and basket positions), plus the course difficulty and rating, into the community database. The most played layout becomes the course's main layout; the others are stored as extra layouts players can pick when starting a round:
+
+```sh
+bun run scripts/import-udisc.ts --lat 35.0919 --lon -80.6523 --count 50 --base https://medisc.ivanvisotsky0.workers.dev --dry
+```
+
+Drop `--dry` to write. A course that already exists in the community database (same name nearby) is merged into that record: pins players placed themselves are kept, and a course created in the app keeps its own pars and hole count. Requests are paced at one every 700 ms.
 
 Medisc is an independent project and is not affiliated with UDisc.
 

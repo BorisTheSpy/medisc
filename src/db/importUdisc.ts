@@ -4,6 +4,7 @@ import { parseUdiscCsv, type UdiscExport, type UdiscLayout } from "@/domain/udis
 import { searchCoursesByName } from "@/services/overpass";
 import { publishCourse } from "@/services/community";
 import type { Course, Hole, HoleScore, LatLon, Player, Round } from "@/domain/types";
+import { MAIN_LAYOUT as MAIN_LAYOUT_ID } from "@/domain/layouts";
 import type { NearbyCourse } from "@/domain/osm";
 
 export interface ImportSummary {
@@ -71,16 +72,16 @@ async function resolveCourse(layout: UdiscLayout, isExtraLayout: boolean, origin
   }
 
   // Apply pars from UDisc, keeping any tee/basket positions already mapped.
-  const holes = await db.holes.where("courseId").equals(course.id).toArray();
+  const holes = await db.holes.where("[courseId+layoutId]").equals([course.id, MAIN_LAYOUT_ID]).toArray();
   const byNumber = new Map(holes.map((h) => [h.number, h]));
   const now = Date.now();
   const next: Hole[] = layout.pars.map((par, i) => {
     const n = i + 1;
     const h = byNumber.get(n);
-    return h ? { ...h, par, updatedAt: now } : { id: `${course!.id}-${n}`, courseId: course!.id, number: n, par, updatedAt: now };
+    return h ? { ...h, par, updatedAt: now } : { id: `${course!.id}-${n}`, courseId: course!.id, layoutId: MAIN_LAYOUT_ID, number: n, par, updatedAt: now };
   });
   await db.transaction("rw", db.holes, db.courses, async () => {
-    await db.holes.where("courseId").equals(course!.id).delete();
+    await db.holes.where("[courseId+layoutId]").equals([course!.id, MAIN_LAYOUT_ID]).delete();
     await db.holes.bulkPut(next);
     await db.courses.update(course!.id, {
       holeCount: next.length,

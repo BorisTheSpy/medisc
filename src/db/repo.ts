@@ -1,5 +1,6 @@
 import { db } from "./db";
-import type { Course, Hole, HoleScore, Player, Round, Zone } from "@/domain/types";
+import type { Course, Hole, HoleScore, Layout, Player, Round, Zone } from "@/domain/types";
+import { MAIN_LAYOUT, holeId, layoutRowId } from "@/domain/layouts";
 import { strokesFromThrows, penaltiesFromThrows } from "@/domain/scoring";
 
 export const uuid = (): string =>
@@ -67,8 +68,9 @@ export async function createCustomCourse(input: { name: string; lat: number; lon
   };
   await db.courses.add(course);
   const holes: Hole[] = Array.from({ length: input.holeCount }, (_, i) => ({
-    id: `${course.id}-${i + 1}`,
+    id: holeId(course.id, MAIN_LAYOUT, i + 1),
     courseId: course.id,
+    layoutId: MAIN_LAYOUT,
     number: i + 1,
     par: input.defaultPar,
     updatedAt: now,
@@ -77,53 +79,78 @@ export async function createCustomCourse(input: { name: string; lat: number; lon
   return course;
 }
 
-export async function saveHoles(courseId: string, holes: Hole[], markFetched = true): Promise<void> {
-  await db.transaction("rw", db.holes, db.courses, async () => {
-    await db.holes.where("courseId").equals(courseId).delete();
-    await db.holes.bulkPut(holes.map((h) => ({ ...h, courseId })));
-    const par = holes.reduce((a, h) => a + h.par, 0);
-    const patch: Partial<Course> = { updatedAt: Date.now() };
-    if (holes.length > 0) {
-      patch.holeCount = holes.length;
-      patch.par = par;
+function holesIn(courseId: string, layoutId: string) {
+  return db.holes.where("[courseId+layoutId]").equals([courseId, layoutId]);
+}
+
+/**
+ * After a layout's holes change: the course carries the main layout's count and par, and a stored
+ * layout row carries its own. Runs inside the caller's transaction.
+ */
+async function refreshTotals(courseId: string, layoutId: string, holes: Hole[], patch: Partial<Course> = {}): Promise<void> {
+  const now = Date.now();
+  const par = holes.reduce((a, h) => a + h.par, 0);
+  const coursePatch: Partial<Course> = { ...patch, updatedAt: now };
+  if (layoutId === MAIN_LAYOUT && holes.length > 0) {
+    coursePatch.holeCount = holes.length;
+    coursePatch.par = par;
+  }
+  await db.courses.update(courseId, coursePatch);
+  const rowId = layoutRowId(courseId, layoutId);
+  if (holes.length > 0 && (await db.layouts.get(rowId))) {
+    const lengths = holes.map((h) => h.distanceM ?? 0);
+    await db.layouts.update(rowId, { holeCount: holes.length, par, distanceM: lengths.some(Boolean) ? lengths.reduce((a, b) => a + b, 0) : undefined, updatedAt: now });
+  }
+}
+
+export async function saveHoles(courseId: string, holes: Hole[], markFetched = true, layoutId: string = MAIN_LAYOUT): Promise<void> {
+  await db.transaction("rw", db.holes, db.courses, db.layouts, async () => {
+    await holesIn(courseId, layoutId).delete();
+    await db.holes.bulkPut(holes.map((h) => ({ ...h, courseId, layoutId, id: holeId(courseId, layoutId, h.number) })));
+    await refreshTotals(courseId, layoutId, holes, markFetched ? { fetchedHolesAt: Date.now() } : {});
+  });
+}
+
+/** Insert or update layout rows for a course. Newer wins per layout. */
+export async function upsertLayouts(courseId: string, layouts: Omit<Layout, "id" | "courseId">[]): Promise<void> {
+  await db.transaction("rw", db.layouts, async () => {
+    for (const l of layouts) {
+      const id = layoutRowId(courseId, l.layoutId);
+      const existing = await db.layouts.get(id);
+      if (existing && existing.updatedAt > l.updatedAt) continue;
+      await db.layouts.put({ ...existing, ...l, id, courseId });
     }
-    if (markFetched) patch.fetchedHolesAt = Date.now();
-    await db.courses.update(courseId, patch);
   });
 }
 
 export async function updateHole(hole: Hole): Promise<void> {
-  await db.transaction("rw", db.holes, db.courses, async () => {
-    await db.holes.put({ ...hole, updatedAt: Date.now() });
-    const holes = await db.holes.where("courseId").equals(hole.courseId).toArray();
+  const layoutId = hole.layoutId || MAIN_LAYOUT;
+  await db.transaction("rw", db.holes, db.courses, db.layouts, async () => {
+    await db.holes.put({ ...hole, layoutId, id: holeId(hole.courseId, layoutId, hole.number), updatedAt: Date.now() });
+    const holes = await holesIn(hole.courseId, layoutId).toArray();
     const course = await db.courses.get(hole.courseId);
-    await db.courses.update(hole.courseId, {
-      par: holes.reduce((a, h) => a + h.par, 0),
-      holeCount: holes.length,
-      tags: { ...(course?.tags ?? {}), __edited: "1" },
-      updatedAt: Date.now(),
-    });
+    await refreshTotals(hole.courseId, layoutId, holes, { tags: { ...(course?.tags ?? {}), __edited: "1" } });
   });
 }
 
 /**
- * Remove one hole from a course. Later holes shift down so numbering stays contiguous. Rounds still in
- * progress on this course are adjusted the same way; finished rounds keep their history untouched.
+ * Remove one hole from a layout. Later holes shift down so numbering stays contiguous. Rounds still in
+ * progress on this layout are adjusted the same way; finished rounds keep their history untouched.
  */
-export async function removeHole(courseId: string, number: number): Promise<void> {
-  await db.transaction("rw", db.holes, db.courses, db.rounds, db.holeScores, async () => {
+export async function removeHole(courseId: string, number: number, layoutId: string = MAIN_LAYOUT): Promise<void> {
+  await db.transaction("rw", db.holes, db.courses, db.layouts, db.rounds, db.holeScores, async () => {
     const now = Date.now();
-    const holes = (await db.holes.where("courseId").equals(courseId).toArray()).sort((a, b) => a.number - b.number);
+    const holes = (await holesIn(courseId, layoutId).toArray()).sort((a, b) => a.number - b.number);
     if (!holes.some((h) => h.number === number) || holes.length <= 1) return;
-    await db.holes.where("courseId").equals(courseId).delete();
+    await holesIn(courseId, layoutId).delete();
     const next: Hole[] = holes
       .filter((h) => h.number !== number)
-      .map((h) => (h.number > number ? { ...h, number: h.number - 1, id: `${courseId}-${h.number - 1}`, updatedAt: now } : h));
+      .map((h) => (h.number > number ? { ...h, number: h.number - 1, id: holeId(courseId, layoutId, h.number - 1), updatedAt: now } : h));
     await db.holes.bulkPut(next);
     const course = await db.courses.get(courseId);
-    await db.courses.update(courseId, { holeCount: next.length, par: next.reduce((a, h) => a + h.par, 0), tags: { ...(course?.tags ?? {}), __edited: "1" }, updatedAt: now });
+    await refreshTotals(courseId, layoutId, next, { tags: { ...(course?.tags ?? {}), __edited: "1" } });
 
-    const live = (await db.rounds.where("courseId").equals(courseId).toArray()).filter((r) => !r.finishedAt && !r.deletedAt);
+    const live = (await db.rounds.where("courseId").equals(courseId).toArray()).filter((r) => !r.finishedAt && !r.deletedAt && (r.layoutId || MAIN_LAYOUT) === layoutId);
     for (const r of live) {
       const scores = await db.holeScores.where("roundId").equals(r.id).toArray();
       await db.holeScores.where("roundId").equals(r.id).delete();
@@ -138,24 +165,26 @@ export async function removeHole(courseId: string, number: number): Promise<void
   });
 }
 
-/** Trim or extend a course to exactly `count` holes. Extra holes come off the end; new ones are par 3. */
-export async function setHoleCount(courseId: string, count: number): Promise<void> {
+/** Trim or extend a layout to exactly `count` holes. Extra holes come off the end; new ones are par 3. */
+export async function setHoleCount(courseId: string, count: number, layoutId: string = MAIN_LAYOUT): Promise<void> {
   const target = Math.max(1, Math.min(36, Math.round(count)));
-  const holes = (await db.holes.where("courseId").equals(courseId).toArray()).sort((a, b) => a.number - b.number);
-  for (let n = holes.length; n > target; n--) await removeHole(courseId, n);
+  const holes = (await holesIn(courseId, layoutId).toArray()).sort((a, b) => a.number - b.number);
+  for (let n = holes.length; n > target; n--) await removeHole(courseId, n, layoutId);
   if (holes.length < target) {
     const now = Date.now();
     const extra: Hole[] = [];
-    for (let n = holes.length + 1; n <= target; n++) extra.push({ id: `${courseId}-${n}`, courseId, number: n, par: 3, updatedAt: now });
-    await db.holes.bulkPut(extra);
-    const all = await db.holes.where("courseId").equals(courseId).toArray();
-    const course = await db.courses.get(courseId);
-    await db.courses.update(courseId, { holeCount: all.length, par: all.reduce((a, h) => a + h.par, 0), tags: { ...(course?.tags ?? {}), __edited: "1" }, updatedAt: now });
+    for (let n = holes.length + 1; n <= target; n++) extra.push({ id: holeId(courseId, layoutId, n), courseId, layoutId, number: n, par: 3, updatedAt: now });
+    await db.transaction("rw", db.holes, db.courses, db.layouts, async () => {
+      await db.holes.bulkPut(extra);
+      const all = await holesIn(courseId, layoutId).toArray();
+      const course = await db.courses.get(courseId);
+      await refreshTotals(courseId, layoutId, all, { tags: { ...(course?.tags ?? {}), __edited: "1" } });
+    });
   }
 }
 
-export async function getHoles(courseId: string): Promise<Hole[]> {
-  const holes = await db.holes.where("courseId").equals(courseId).toArray();
+export async function getHoles(courseId: string, layoutId: string = MAIN_LAYOUT): Promise<Hole[]> {
+  const holes = await holesIn(courseId, layoutId).toArray();
   return holes.sort((a, b) => a.number - b.number);
 }
 
@@ -166,6 +195,7 @@ export interface NewRoundInput {
   startingHole: number;
   holeNumbers: number[];
   trackThrows: boolean;
+  layout?: Pick<Layout, "layoutId" | "name">;
 }
 
 export async function createRound(input: NewRoundInput): Promise<Round> {
@@ -174,6 +204,8 @@ export async function createRound(input: NewRoundInput): Promise<Round> {
     id: uuid(),
     courseId: input.course.id,
     courseName: input.course.name,
+    layoutId: input.layout && input.layout.layoutId !== MAIN_LAYOUT ? input.layout.layoutId : undefined,
+    layoutName: input.layout && input.layout.layoutId !== MAIN_LAYOUT ? input.layout.name : undefined,
     startedAt: now,
     playerIds: input.playerIds,
     holeNumbers: input.holeNumbers,
@@ -332,24 +364,26 @@ export async function setSetting(key: string, value: unknown): Promise<void> {
 }
 
 export async function exportAll(): Promise<string> {
-  const [players, courses, holes, rounds, holeScores, settings] = await Promise.all([
+  const [players, courses, holes, layouts, rounds, holeScores, settings] = await Promise.all([
     db.players.toArray(),
     db.courses.toArray(),
     db.holes.toArray(),
+    db.layouts.toArray(),
     db.rounds.toArray(),
     db.holeScores.toArray(),
     db.settings.toArray(),
   ]);
-  return JSON.stringify({ version: 1, exportedAt: Date.now(), players, courses, holes, rounds, holeScores, settings }, null, 2);
+  return JSON.stringify({ version: 2, exportedAt: Date.now(), players, courses, holes, layouts, rounds, holeScores, settings }, null, 2);
 }
 
 export async function importAll(json: string): Promise<{ rounds: number }> {
-  const data = JSON.parse(json) as { players: Player[]; courses: Course[]; holes: Hole[]; rounds: Round[]; holeScores: HoleScore[]; settings?: { key: string; value: unknown }[] };
+  const data = JSON.parse(json) as { players: Player[]; courses: Course[]; holes: Hole[]; layouts?: Layout[]; rounds: Round[]; holeScores: HoleScore[]; settings?: { key: string; value: unknown }[] };
   if (!Array.isArray(data.rounds) || !Array.isArray(data.players)) throw new Error("Not a Medisc backup file");
-  await db.transaction("rw", [db.players, db.courses, db.holes, db.rounds, db.holeScores, db.settings], async () => {
+  await db.transaction("rw", [db.players, db.courses, db.holes, db.layouts, db.rounds, db.holeScores, db.settings], async () => {
     await db.players.bulkPut(data.players);
     await db.courses.bulkPut(data.courses ?? []);
-    await db.holes.bulkPut(data.holes ?? []);
+    await db.holes.bulkPut((data.holes ?? []).map((h) => ({ ...h, layoutId: h.layoutId || MAIN_LAYOUT })));
+    await db.layouts.bulkPut(data.layouts ?? []);
     await db.rounds.bulkPut(data.rounds);
     await db.holeScores.bulkPut(data.holeScores ?? []);
     if (data.settings) await db.settings.bulkPut(data.settings);

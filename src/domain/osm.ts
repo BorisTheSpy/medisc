@@ -1,4 +1,5 @@
 import type { Course, Hole, LatLon } from "./types";
+import { MAIN_LAYOUT } from "./layouts";
 import { haversineM } from "./geo";
 
 export interface OverpassElement {
@@ -74,7 +75,7 @@ export function parseNearbyCourses(json: OverpassResponse, origin?: LatLon): Nea
     const pos = elementPosition(e);
     if (!pos) continue;
     const name = tags.name ?? tags["name:en"];
-    if (!name) continue;
+    if (!name || JUNK_NAME.test(name)) continue;
     const course: NearbyCourse = {
       id: `osm-${e.type}-${e.id}`,
       source: "osm",
@@ -130,24 +131,82 @@ export function parseNearbyCourses(json: OverpassResponse, origin?: LatLon): Nea
 /** Merge OSM courses (preferred: may carry hole geometry) with directory courses, deduping by name and proximity. */
 export function mergeCourseLists(osm: NearbyCourse[], directory: NearbyCourse[]): NearbyCourse[] {
   const out = [...osm];
+  // Sources each entry has absorbed during this merge. Kept per call: the same lists are merged again on
+  // every progressive update, and state that outlived a call turned every re-merge into duplicates.
+  const absorbed = new Map<NearbyCourse, Set<string>>();
+  const sourcesOf = (c: NearbyCourse) => {
+    let set = absorbed.get(c);
+    if (!set) absorbed.set(c, (set = new Set([c.source])));
+    return set;
+  };
   for (const d of directory) {
+    if (out.some((k) => k.id === d.id)) continue;
     const key = normaliseName(d.name);
-    const dup = out.find((k) => {
-      const kk = normaliseName(k.name);
-      const nameMatch = kk === key || kk.startsWith(key) || key.startsWith(kk) || sharesWords(kk, key);
-      return haversineM(k, d) < (nameMatch ? 2500 : 120);
-    });
+    // Nearest eligible duplicate wins. A record never merges into one from its own source, or into one that
+    // already absorbed its source: a park with two courses lists both in the directory, and both must survive.
+    const dup = out
+      .filter((k) => !sourcesOf(k).has(d.source))
+      .map((k) => {
+        const kk = normaliseName(k.name);
+        const nameMatch = kk === key || kk.startsWith(key) || key.startsWith(kk) || sharesWords(kk, key);
+        const dist = haversineM(k, d);
+        // Two records with real, clearly different hole counts are two courses in one park (a 9 beside an 18).
+        const realCounts = k.source !== "places" && d.source !== "places" && k.holeCount > 0 && d.holeCount > 0;
+        const differentCourse = realCounts && Math.abs(k.holeCount - d.holeCount) > 2;
+        return { k, dist, ok: !differentCourse && dist < (nameMatch ? 2500 : 120) };
+      })
+      .filter((x) => x.ok)
+      .sort((a, b) => a.dist - b.dist)[0]?.k;
     if (dup) {
+      sourcesOf(dup).add(d.source);
       dup.par ??= d.par;
       dup.city ??= d.city;
       dup.website ??= d.website;
-      if (!dup.tags?.["disc_golf:course"] && d.holeCount) dup.holeCount = d.holeCount;
+      // A record with a real layout keeps its hole count; only fill one that is missing.
+      if (!dup.holeCount && d.holeCount) dup.holeCount = d.holeCount;
+      dup.difficulty ??= d.difficulty;
+      dup.rating ??= d.rating;
       continue;
     }
     out.push(d);
   }
   out.sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0));
   return out;
+}
+
+/** Hole and tee features occasionally carry the course tag; their names are not courses. */
+const JUNK_NAME = /^\s*(hole|tee|basket|target)\s*#?\d+\s*$|practice\s+basket/i;
+const DISC_GOLF_NAME = /disc\s*golf|frisbee|dgc\b|\bdg\b/i;
+
+/**
+ * Google Places returns parks near any "disc golf" search. Keep a Places result only when its name says disc
+ * golf, or when a course from another source anchors it: within 300 m, or within 1 km sharing a name word
+ * (large parks pin their course far from the park entrance).
+ */
+export function validatePlaces(list: NearbyCourse[]): NearbyCourse[] {
+  const anchors = list.filter((c) => c.source !== "places");
+  return list.filter((c) => {
+    if (c.source !== "places") return true;
+    if (DISC_GOLF_NAME.test(c.name)) return true;
+    const words = nameWords(c.name);
+    return anchors.some((a) => {
+      const d = haversineM(a, c);
+      return d < 300 || (d < 1000 && nameWords(a.name).some((w) => words.includes(w)));
+    });
+  });
+}
+
+function nameWords(name: string): string[] {
+  return normaliseName(name)
+    .split(" ")
+    .filter((w) => w.length > 2 && !STOP.has(w));
+}
+
+/** Drop anything a player has reported as not a disc golf course: same key, or same name within 250 m. */
+export function dropHidden(list: NearbyCourse[], hidden: { key: string; name: string; lat: number; lon: number }[]): NearbyCourse[] {
+  if (hidden.length === 0) return list;
+  const keys = new Set(hidden.map((h) => h.key));
+  return list.filter((c) => !keys.has(c.id) && !hidden.some((h) => normaliseName(h.name) === normaliseName(c.name) && haversineM(h, c) < 250));
 }
 
 const STOP = new Set(["disc", "golf", "course", "dgc", "park", "the", "at", "of", "and", "frisbeegolfrata", "frisbeegolf"]);
@@ -185,6 +244,7 @@ export function parseCourseHoles(json: OverpassResponse, courseId: string): Hole
     holes.push({
       id: `${courseId}-${number}`,
       courseId,
+      layoutId: MAIN_LAYOUT,
       number,
       par,
       distanceM,
@@ -213,6 +273,7 @@ export function parseCourseHoles(json: OverpassResponse, courseId: string): Hole
       holes.push({
         id: `${courseId}-${number}`,
         courseId,
+        layoutId: MAIN_LAYOUT,
         number,
         par: Number(tee?.tags?.par ?? basket?.tags?.par) || 3,
         distanceM: teePos && basketPos ? Math.round(haversineM(teePos, basketPos)) : undefined,

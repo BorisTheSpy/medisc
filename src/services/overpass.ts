@@ -1,9 +1,9 @@
 import { db } from "@/db/db";
 import type { Course, LatLon } from "@/domain/types";
-import { nearbyQuery, nameQuery, courseHolesQuery, parseNearbyCourses, parseCourseHoles, mergeCourseLists, type OverpassResponse, type NearbyCourse } from "@/domain/osm";
+import { nearbyQuery, nameQuery, courseHolesQuery, parseNearbyCourses, parseCourseHoles, mergeCourseLists, validatePlaces, dropHidden, type OverpassResponse, type NearbyCourse } from "@/domain/osm";
 import { fetchUsCourses, searchUsCoursesByName } from "./discgolfapi";
 import { fetchPlacesCourses, searchPlacesByName } from "./places";
-import { fetchCommunityCourses, searchCommunityCourses } from "./community";
+import { fetchCommunityNearby, searchCommunityCourses, type HiddenCourse } from "./community";
 
 const DIRECT_ENDPOINTS = [
   "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
@@ -83,20 +83,25 @@ export async function fetchNearbyCourses(
   let us: NearbyCourse[] = [];
   let places: NearbyCourse[] = [];
   let community: NearbyCourse[] = [];
-  // Community entries carry shared layouts, so they win the dedupe against directory copies.
+  let hidden: HiddenCourse[] = [];
+  // Community entries carry shared layouts, so they win the dedupe against directory copies. Google results
+  // are kept only when validated against a name or another source, and reported places are dropped.
+  // Community records carry shared layouts and difficulty, so they are the base every other copy folds into.
+  const assemble = (osm: NearbyCourse[]) => dropHidden(validatePlaces(mergeCourseLists(community, mergeCourseLists(osm, mergeCourseLists(us, places)))), hidden);
   const fastList = () => mergeCourseLists(community, mergeCourseLists(us, places));
   const emit = () => {
     if (opts.signal?.aborted) return;
     const osmNow = cachedFresh ? parseNearbyCourses(cached!.json as OverpassResponse, center) : [];
     const fast = fastList();
-    if (fast.length > 0) opts.onUpdate?.(mergeCourseLists(osmNow, fast));
+    if (fast.length > 0) opts.onUpdate?.(assemble(osmNow));
   };
-  const communityPromise = fetchCommunityCourses(center, radiusM, opts.signal)
-    .catch(() => [] as NearbyCourse[])
-    .then((list) => {
-      community = list;
+  const communityPromise = fetchCommunityNearby(center, radiusM, opts.signal)
+    .catch(() => ({ courses: [] as NearbyCourse[], hidden: [] as HiddenCourse[] }))
+    .then((res) => {
+      community = res.courses;
+      hidden = res.hidden;
       emit();
-      return list;
+      return res.courses;
     });
   const usPromise = fetchUsCourses(center, radiusM, opts.signal)
     .catch(() => [] as NearbyCourse[])
@@ -116,7 +121,7 @@ export async function fetchNearbyCourses(
   if (cachedFresh) {
     const osm = parseNearbyCourses(cached!.json as OverpassResponse, center);
     await Promise.all([usPromise, placesPromise, communityPromise]);
-    return { courses: mergeCourseLists(osm, fastList()), fromCache: true, fetchedAt: cached!.fetchedAt };
+    return { courses: assemble(osm), fromCache: true, fetchedAt: cached!.fetchedAt };
   }
 
   let osm: NearbyCourse[] | null = null;
@@ -132,7 +137,7 @@ export async function fetchNearbyCourses(
   await Promise.all([usPromise, placesPromise, communityPromise]);
   const fast = fastList();
   if (osm === null && fast.length === 0) throw osmError instanceof Error ? osmError : new OverpassError("Course search is unavailable right now");
-  return { courses: mergeCourseLists(osm ?? [], fast), fromCache: osm !== null && osmError !== null, fetchedAt: Date.now() };
+  return { courses: assemble(osm ?? []), fromCache: osm !== null && osmError !== null, fetchedAt: Date.now() };
 }
 
 /**
@@ -147,7 +152,7 @@ export async function searchCoursesByName(text: string, origin: LatLon | null, o
   ]);
   if (signal?.aborted) return;
   // Player-given names win over directory and Google names for the same course.
-  const directory = mergeCourseLists(community, mergeCourseLists(dir, gp));
+  const directory = validatePlaces(mergeCourseLists(community, mergeCourseLists(dir, gp)));
   onUpdate(directory);
   if (!origin) return;
   try {

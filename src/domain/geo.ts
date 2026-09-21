@@ -92,3 +92,20 @@ export function centroid(points: LatLon[]): LatLon | undefined {
   const sum = points.reduce((acc, p) => ({ lat: acc.lat + p.lat, lon: acc.lon + p.lon }), { lat: 0, lon: 0 });
   return { lat: sum.lat / points.length, lon: sum.lon / points.length };
 }
+
+const DIFFICULTY_LABEL: Record<string, string> = { easy: "Easy", intermediate: "Moderate", challenging: "Hard", "very-challenging": "Very hard" };
+const DIFFICULTY_ORDER = ["easy", "intermediate", "challenging", "very-challenging"];
+
+/** "easy,intermediate" → "Easy – Moderate"; a single bin → its label; unknown → null. */
+export function formatDifficulty(bins: string | undefined | null): string | null {
+  if (!bins) return null;
+  const known = bins
+    .split(",")
+    .map((b) => b.trim())
+    .filter((b) => b in DIFFICULTY_LABEL)
+    .sort((a, b) => DIFFICULTY_ORDER.indexOf(a) - DIFFICULTY_ORDER.indexOf(b));
+  if (known.length === 0) return null;
+  const lo = DIFFICULTY_LABEL[known[0]!]!;
+  const hi = DIFFICULTY_LABEL[known[known.length - 1]!]!;
+  return lo === hi ? lo : `${lo} – ${hi}`;
+}

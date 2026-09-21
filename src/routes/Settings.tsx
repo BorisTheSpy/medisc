@@ -3,7 +3,6 @@ import { useNavigate } from "react-router";
 import { Download, Upload, Trash2 } from "lucide-react";
 import { useMe, useSetting } from "@/db/hooks";
 import { clearCaches, exportAll, importAll, setSetting, updatePlayer } from "@/db/repo";
-import { applyTheme, getThemePref, type ThemePref } from "@/lib/theme";
 import type { Units } from "@/domain/geo";
 import { Button, Field, PageHeader, Section, Segmented, Toast } from "@/components/ui";
 import { LocateFixed, FileDown, LogOut, UserCheck, RefreshCw } from "lucide-react";
@@ -20,7 +19,6 @@ export function SettingsRoute() {
   const me = useMe();
   const units = useSetting<Units>("units", "ft");
   const satellite = useSetting<boolean>("satellite", false);
-  const [theme, setTheme] = useState<ThemePref>(getThemePref());
   const [name, setName] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [geoTest, setGeoTest] = useState<string>("");
@@ -243,20 +241,6 @@ export function SettingsRoute() {
               options={[
                 { value: "ft", label: "Feet & miles" },
                 { value: "m", label: "Metres" },
-              ]}
-            />
-          </Row>
-          <Row label="Theme">
-            <Segmented
-              value={theme}
-              onChange={(v) => {
-                setTheme(v);
-                applyTheme(v);
-              }}
-              options={[
-                { value: "system", label: "Auto" },
-                { value: "light", label: "Light" },
-                { value: "dark", label: "Dark" },
               ]}
             />
           </Row>
