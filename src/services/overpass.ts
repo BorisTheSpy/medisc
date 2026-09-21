@@ -3,7 +3,7 @@ import type { Course, LatLon } from "@/domain/types";
 import { nearbyQuery, nameQuery, courseHolesQuery, parseNearbyCourses, parseCourseHoles, mergeCourseLists, validatePlaces, dropHidden, type OverpassResponse, type NearbyCourse } from "@/domain/osm";
 import { fetchUsCourses, searchUsCoursesByName } from "./discgolfapi";
 import { fetchPlacesCourses, searchPlacesByName } from "./places";
-import { fetchCommunityNearby, searchCommunityCourses, type HiddenCourse } from "./community";
+import { fetchCommunityNearby, searchCommunityCourses, tombstoneHidden, type HiddenCourse } from "./community";
 
 const DIRECT_ENDPOINTS = [
   "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
@@ -100,6 +100,7 @@ export async function fetchNearbyCourses(
     .then((res) => {
       community = res.courses;
       hidden = res.hidden;
+      void tombstoneHidden(hidden);
       emit();
       return res.courses;
     });

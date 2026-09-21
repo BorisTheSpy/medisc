@@ -255,6 +255,20 @@ export async function fetchCommunityNearby(center: LatLon, radiusM: number, sign
   return { courses: rowsToCourses(json.courses), hidden: json.hidden ?? [] };
 }
 
+/**
+ * A place reported as not a course may still sit in this device's saved courses from an earlier visit.
+ * Tombstone those copies so "Courses you've opened" stops offering them. Rounds played there stay.
+ */
+export async function tombstoneHidden(hidden: HiddenCourse[]): Promise<void> {
+  if (hidden.length === 0) return;
+  const keys = new Set(hidden.map((h) => h.key));
+  const now = Date.now();
+  await db.courses
+    .filter((c) => !c.deletedAt && c.source !== "custom" && keys.has(c.id))
+    .modify({ deletedAt: now, updatedAt: now })
+    .catch(() => undefined);
+}
+
 /** Report that a listed place has no disc golf course. Hides it for everyone. */
 export async function hideCourse(course: Course, reason = "no disc golf here"): Promise<boolean> {
   try {
