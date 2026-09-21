@@ -34,11 +34,11 @@ export function RoundRow({ round, scores, players, meId, onClick, subtitle }: { 
         <div className="label mt-2 truncate text-ink-3">
           {subtitle}
           {others.length > 0 && ` · with ${others.map((id) => players.find((p) => p.id === id)?.name.split(" ")[0] ?? "?").join(", ")}`}
-          {round.playerIds.length > 1 && rank === 1 && <span className="text-lime"> · Won</span>}
+          {round.playerIds.length > 1 && rank === 1 && <span className="text-birdie"> · Won</span>}
         </div>
       </div>
       <div className="text-right">
-        <div className={cx("display numeric text-[30px]", under ? "text-lime" : mine && mine.toPar > 0 ? "text-ink" : "text-ink-2")}>{mine && mine.holesScored ? formatToPar(mine.toPar) : leader ? formatToPar(leader.toPar) : "–"}</div>
+        <div className={cx("display numeric text-[30px]", under ? "text-birdie" : mine && mine.toPar > 0 ? "text-ink" : "text-ink-2")}>{mine && mine.holesScored ? formatToPar(mine.toPar) : leader ? formatToPar(leader.toPar) : "–"}</div>
         <div className="label mt-1.5 text-ink-3">{mine ? `${mine.strokes} · ${mine.holesScored} holes` : leader ? `${leaderName} · not on card` : "no scores"}</div>
       </div>
       <ChevronRight size={18} className="shrink-0 text-ink-3" />

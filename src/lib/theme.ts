@@ -7,7 +7,7 @@ export function getThemePref(): ThemePref {
 
 export function applyTheme(_pref?: ThemePref): void {
   document.documentElement.setAttribute("data-theme", "dark");
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#3b3c38");
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#0c1a2c");
 }
 
 export function applyStoredTheme(): void {

@@ -17,13 +17,13 @@ const RANGES: { value: RangeKey; label: string }[] = [
 ];
 
 const DIST_ORDER = [
-  { key: "ace", label: "Ace", color: "#d2ff00" },
-  { key: "eagle", label: "Eagle", color: "#c2ea1a" },
-  { key: "birdie", label: "Birdie", color: "#a7cc2a" },
-  { key: "par", label: "Par", color: "#9a9c8e" },
-  { key: "bogey", label: "Bogey", color: "#e0dfd4" },
-  { key: "double", label: "Double", color: "#f4f4ed" },
-  { key: "triple", label: "Triple+", color: "#ff5b3a" },
+  { key: "ace", label: "Ace", color: "#8ff2cc" },
+  { key: "eagle", label: "Eagle", color: "#5fdcaa" },
+  { key: "birdie", label: "Birdie", color: "#3fb98a" },
+  { key: "par", label: "Par", color: "#8497b3" },
+  { key: "bogey", label: "Bogey", color: "#b9c7dc" },
+  { key: "double", label: "Double", color: "#eef3fa" },
+  { key: "triple", label: "Triple+", color: "#ff6a52" },
 ] as const;
 
 export function StatsRoute() {
@@ -94,7 +94,7 @@ export function StatsRoute() {
       </div>
 
       <Section className="mt-4">
-        <div className="rounded-[39px] bg-lime px-[22px] py-[22px] text-on-lime">
+        <div className="rounded-[39px] bg-live px-[22px] py-[22px] text-on-live">
           <div className="flex items-end justify-between">
             <div>
               <div className="label">Form, last 5 rounds</div>
@@ -137,7 +137,7 @@ export function StatsRoute() {
                       if (!active || !payload?.length) return null;
                       const p = payload[0].payload as (typeof formData)[number];
                       return (
-                        <div className="rounded-[6px] bg-lime px-3 py-2 text-xs font-bold text-on-lime">
+                        <div className="rounded-[6px] bg-live px-3 py-2 text-xs font-bold text-on-live">
                           <div className="font-bold">{formatToPar(p.toPar)}</div>
                           <div>
                             {p.course} · {p.holes} holes · {p.label}
@@ -146,7 +146,7 @@ export function StatsRoute() {
                       );
                     }}
                   />
-                  <Line type="monotone" dataKey="toPar" stroke="#d2ff00" strokeWidth={2.5} dot={{ r: 3, fill: "#d2ff00", strokeWidth: 0 }} activeDot={{ r: 5 }} isAnimationActive={false} />
+                  <Line type="monotone" dataKey="toPar" stroke="#ffb340" strokeWidth={2.5} dot={{ r: 3, fill: "#ffb340", strokeWidth: 0 }} activeDot={{ r: 5 }} isAnimationActive={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -165,7 +165,7 @@ export function StatsRoute() {
               <BarChart data={distData} margin={{ top: 4, right: 0, bottom: 0, left: -24 }}>
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--ink-3)" }} tickLine={false} axisLine={false} interval={0} />
                 <YAxis tick={{ fontSize: 10, fill: "var(--ink-3)" }} tickLine={false} axisLine={false} allowDecimals={false} />
-                <Tooltip cursor={{ fill: "var(--surface-2)" }} formatter={(v) => [`${v} holes`, ""]} contentStyle={{ background: "#d2ff00", color: "#282c20", border: 0, borderRadius: 6, fontSize: 12, fontWeight: 700 }} itemStyle={{ color: "#282c20" }} labelStyle={{ color: "#282c20" }} />
+                <Tooltip cursor={{ fill: "var(--surface-2)" }} formatter={(v) => [`${v} holes`, ""]} contentStyle={{ background: "#ffb340", color: "#1d1305", border: 0, borderRadius: 6, fontSize: 12, fontWeight: 700 }} itemStyle={{ color: "#1d1305" }} labelStyle={{ color: "#1d1305" }} />
                 <Bar dataKey="value" radius={[6, 6, 0, 0]} isAnimationActive={false}>
                   {distData.map((d) => (
                     <Cell key={d.key} fill={d.color} />
@@ -191,14 +191,14 @@ export function StatsRoute() {
           <div className="overflow-hidden rounded-card bg-surface shadow-card">
             {best.map((r, i) => (
               <button key={r.roundId} onClick={() => nav(`/rounds/${r.roundId}`)} className="flex w-full items-center gap-3 border-b hairline px-4 py-3 text-left last:border-b-0 active:bg-surface-2">
-                <span className="display numeric w-6 text-lime">{i + 1}</span>
+                <span className="display numeric w-6 text-live">{i + 1}</span>
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-semibold">{r.courseName}</div>
                   <div className="text-xs text-ink-3">
                     {format(new Date(r.startedAt), "d MMM yyyy")} · {r.holes} holes
                   </div>
                 </div>
-                <span className={cx("display numeric text-[28px]", r.toPar < 0 ? "text-lime" : "text-ink")}>{formatToPar(r.toPar)}</span>
+                <span className={cx("display numeric text-[28px]", r.toPar < 0 ? "text-birdie" : "text-ink")}>{formatToPar(r.toPar)}</span>
               </button>
             ))}
           </div>

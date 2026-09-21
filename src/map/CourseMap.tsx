@@ -72,8 +72,8 @@ function holesGeoJSON(holes: Hole[]): FeatureCollection {
   };
 }
 
-const ACTIVE = "#d2ff00";
-const LINE = "#f4f4ed";
+const ACTIVE = "#ffb340";
+const LINE = "#eef3fa";
 
 function lineColor(active?: number) {
   return ["case", ["==", ["get", "number"], active ?? -1], ACTIVE, LINE] as unknown as string;
@@ -94,7 +94,7 @@ function ensureHoleLayers(map: MLMap, holes: Hole[], active?: number) {
       type: "line",
       source: "holes",
       layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": "#282c20", "line-width": lineWidth(active, true), "line-opacity": 0.85 },
+      paint: { "line-color": "#0c1a2c", "line-width": lineWidth(active, true), "line-opacity": 0.85 },
     });
     map.addLayer({
       id: "holes-line",
@@ -280,7 +280,7 @@ export function CourseMap({ center, holes = [], activeHole, user, satellite = fa
             aria-pressed={satellite}
             aria-label="Toggle satellite imagery"
             onClick={() => onSatelliteChange(!satellite)}
-            className={cx("grid h-10 w-10 place-items-center rounded-full border border-line-strong", satellite ? "bg-lime text-on-lime" : "bg-surface text-ink")}
+            className={cx("grid h-10 w-10 place-items-center rounded-full border border-line-strong", satellite ? "bg-live text-on-live" : "bg-surface text-ink")}
           >
             <Layers size={18} />
           </button>

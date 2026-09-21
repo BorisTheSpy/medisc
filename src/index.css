@@ -18,36 +18,38 @@
   src: url("/fonts/mona-sans.woff2") format("woff2");
 }
 
-/* Medisc visual system: charcoal field, dark olive panels, acid lime for everything live. */
+/* Medisc visual system: a night-blue field, blue hairlines for structure, amber for everything live,
+   mint only for under par, signal red only for bad news. */
 :root {
-  --bg: #3b3c38;
-  --bg-deep: #2f302c;
-  --surface: #282c20;
-  --surface-2: #3a3f2e;
-  --surface-3: #48503a;
-  --ink: #f4f4ed;
-  --ink-2: #cfd0c4;
-  --ink-3: #acaea0;
-  --line: rgba(210, 255, 0, 0.16);
-  --line-strong: rgba(244, 244, 237, 0.22);
-  --lime: #d2ff00;
-  --lime-2: #e4ff5c;
-  --on-lime: #282c20;
-  --brand: #282c20;
-  --brand-2: #323628;
-  --brand-ink: #f4f4ed;
-  --accent: #d2ff00;
-  --accent-2: #e4ff5c;
-  --accent-ink: #282c20;
-  --danger: #ff5b3a;
-  --danger-ink: #282c20;
-  --ace: #d2ff00;
-  --eagle: #d2ff00;
-  --birdie: #d2ff00;
-  --birdie-soft: rgba(210, 255, 0, 0.14);
-  --bogey: #f4f4ed;
-  --double: #f4f4ed;
-  --triple: #ff5b3a;
+  --bg: #0c1a2c;
+  --bg-deep: #07101c;
+  --surface: #132842;
+  --surface-2: #1c3759;
+  --surface-3: #27497a;
+  --ink: #eef3fa;
+  --ink-2: #b9c7dc;
+  --ink-3: #8497b3;
+  --line: rgba(112, 170, 255, 0.18);
+  --line-strong: rgba(238, 243, 250, 0.22);
+  --live: #ffb340;
+  --live-2: #ffc668;
+  --on-live: #1d1305;
+  --sky: #6cb8ff;
+  --brand: #132842;
+  --brand-2: #1c3759;
+  --brand-ink: #eef3fa;
+  --accent: #ffb340;
+  --accent-2: #ffc668;
+  --accent-ink: #1d1305;
+  --danger: #ff6a52;
+  --danger-ink: #1d1305;
+  --ace: #5fdcaa;
+  --eagle: #5fdcaa;
+  --birdie: #5fdcaa;
+  --birdie-soft: rgba(95, 220, 170, 0.14);
+  --bogey: #eef3fa;
+  --double: #eef3fa;
+  --triple: #ff6a52;
   --radius-sm: 2px;
   --radius-md: 6px;
   --radius-lg: 14px;
@@ -69,9 +71,10 @@
   --color-ink-3: var(--ink-3);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
-  --color-lime: var(--lime);
-  --color-lime-2: var(--lime-2);
-  --color-on-lime: var(--on-lime);
+  --color-live: var(--live);
+  --color-live-2: var(--live-2);
+  --color-on-live: var(--on-live);
+  --color-sky: var(--sky);
   --color-brand: var(--brand);
   --color-brand-2: var(--brand-2);
   --color-brand-ink: var(--brand-ink);
@@ -101,7 +104,7 @@ body,
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: radial-gradient(90% 38% at 50% 0%, #1a3762 0%, rgba(26, 55, 98, 0) 100%) no-repeat, var(--bg);
   color: var(--ink);
   font-family: var(--font-sans);
   font-weight: 500;
@@ -112,16 +115,16 @@ body {
 }
 
 ::selection {
-  background: var(--lime);
-  color: var(--on-lime);
+  background: var(--live);
+  color: var(--on-live);
 }
 
 input,
 textarea {
-  caret-color: var(--lime);
+  caret-color: var(--live);
 }
 
-/* Display voice: heavy serif, set tight like a race hub headline. */
+/* Display voice: heavy serif, set tight like a timing screen headline. */
 .display {
   font-family: var(--font-display);
   font-weight: 400;
@@ -160,7 +163,7 @@ button,
 }
 
 :focus-visible {
-  outline: 2px solid var(--lime);
+  outline: 2px solid var(--live);
   outline-offset: 2px;
 }
 
@@ -171,10 +174,10 @@ textarea {
   color: inherit;
 }
 
-/* Score strike: the number snaps in with a lime flash, no tween on the digit itself. */
+/* Score strike: the number snaps in with a live flash, no tween on the digit itself. */
 @keyframes strike {
   0% {
-    color: var(--lime);
+    color: var(--live);
   }
   100% {
     color: inherit;
@@ -218,7 +221,7 @@ textarea {
 
 .maplibregl-ctrl-attrib {
   font-size: 10px;
-  background: rgba(40, 44, 32, 0.85) !important;
+  background: rgba(12, 26, 44, 0.85) !important;
   color: var(--ink-2) !important;
 }
 
@@ -247,33 +250,33 @@ textarea {
   font-weight: 800;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-  border: 2px solid #282c20;
+  border: 2px solid #0c1a2c;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
 }
 
 .hole-marker.tee {
-  background: var(--lime);
-  color: var(--on-lime);
+  background: var(--live);
+  color: var(--on-live);
 }
 
 .hole-marker.basket {
-  background: #282c20;
-  color: var(--lime);
-  border-color: var(--lime);
+  background: #0c1a2c;
+  color: var(--live);
+  border-color: var(--live);
 }
 
 .hole-marker.active {
   transform: scale(1.25);
-  border-color: #f4f4ed;
+  border-color: #eef3fa;
 }
 
 .user-dot {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--lime);
-  border: 3px solid #282c20;
-  box-shadow: 0 0 0 3px rgba(210, 255, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.5);
+  background: var(--live);
+  border: 3px solid #0c1a2c;
+  box-shadow: 0 0 0 3px rgba(255, 179, 64, 0.35), 0 2px 6px rgba(0, 0, 0, 0.5);
 }
 
 .course-pin {
@@ -281,21 +284,21 @@ textarea {
   height: 30px;
   border-radius: 50% 50% 50% 0;
   transform: rotate(-45deg);
-  background: #282c20;
-  border: 2px solid var(--lime);
+  background: #0c1a2c;
+  border: 2px solid var(--live);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
   display: grid;
   place-items: center;
 }
 
 .course-pin.active {
-  background: var(--lime);
+  background: var(--live);
   transform: rotate(-45deg) scale(1.25);
   z-index: 2;
 }
 
 .course-pin.active::after {
-  background: #282c20;
+  background: #0c1a2c;
 }
 
 .course-pin::after {
@@ -303,5 +306,5 @@ textarea {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--lime);
+  background: var(--live);
 }

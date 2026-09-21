@@ -38,7 +38,7 @@ export function Onboarding() {
           <br />
           not
           <br />
-          <span className="text-lime">spreadsheets.</span>
+          <span className="text-live">spreadsheets.</span>
         </h1>
         <p className="mt-[22px] max-w-xs text-[15px] font-medium text-ink-2">Find the course you're standing on, score the whole card in one tap per hole, and keep every round. Free, no subscription.</p>
       </div>

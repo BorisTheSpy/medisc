@@ -10,8 +10,8 @@ type Variant = "primary" | "brand" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
 
 const VARIANT: Record<Variant, string> = {
-  primary: "bg-lime text-on-lime hover:bg-lime-2 active:bg-lime-2",
-  brand: "bg-ink text-on-lime hover:bg-white active:bg-white",
+  primary: "bg-live text-on-live hover:bg-live-2 active:bg-live-2",
+  brand: "bg-ink text-on-live hover:bg-white active:bg-white",
   secondary: "bg-surface-2 text-ink border border-line-strong hover:bg-surface-3 active:bg-surface-3",
   ghost: "bg-transparent text-ink hover:bg-surface-2 active:bg-surface-2",
   danger: "bg-danger text-danger-ink hover:opacity-90",
@@ -52,7 +52,7 @@ export const Field = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
       <input
         ref={ref}
         id={inputId}
-        className={cx("h-12 w-full rounded-[6px] border border-line-strong bg-surface px-3.5 text-[15px] font-semibold text-ink placeholder:text-ink-3 placeholder:font-medium focus:border-lime focus:outline-none", className)}
+        className={cx("h-12 w-full rounded-[6px] border border-line-strong bg-surface px-3.5 text-[15px] font-semibold text-ink placeholder:text-ink-3 placeholder:font-medium focus:border-live focus:outline-none", className)}
         {...rest}
       />
       {hint && <span className="mt-1.5 block text-[12px] font-medium text-ink-3">{hint}</span>}
@@ -92,7 +92,7 @@ export function Segmented<T extends string>({ value, onChange, options, classNam
           role="tab"
           aria-selected={o.value === value}
           onClick={() => onChange(o.value)}
-          className={cx("label h-8 rounded-[39px] px-3.5 uppercase transition-colors duration-150 ease", o.value === value ? "bg-lime text-on-lime" : "text-ink-2")}
+          className={cx("label h-8 rounded-[39px] px-3.5 uppercase transition-colors duration-150 ease", o.value === value ? "bg-live text-on-live" : "text-ink-2")}
         >
           {o.label}
         </button>
@@ -109,7 +109,7 @@ export function Chip({ active, children, onClick, className }: { active?: boolea
       aria-pressed={active}
       className={cx(
         "label inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[39px] border px-3.5 uppercase transition-colors duration-150 ease",
-        active ? "border-lime bg-lime text-on-lime" : "border-line-strong bg-transparent text-ink hover:bg-surface-2",
+        active ? "border-live bg-live text-on-live" : "border-line-strong bg-transparent text-ink hover:bg-surface-2",
         className,
       )}
     >
@@ -139,8 +139,8 @@ export function StatTile({ label, value, sub, tone, trend, className }: { label:
     <div className={cx("rounded-[6px] bg-surface p-[11px]", className)}>
       <div className="label text-ink-3">{label}</div>
       <div className="mt-2 flex items-baseline gap-1.5">
-        <span className={cx("display numeric text-[30px]", tone === "good" && "text-lime", tone === "bad" && "text-triple")}>{value}</span>
-        {trend && trend !== "flat" && (trend === "up" ? <TrendingUp size={14} className="text-lime" aria-label="trending up" /> : <TrendingDown size={14} className="text-triple" aria-label="trending down" />)}
+        <span className={cx("display numeric text-[30px]", tone === "good" && "text-birdie", tone === "bad" && "text-triple")}>{value}</span>
+        {trend && trend !== "flat" && (trend === "up" ? <TrendingUp size={14} className="text-live" aria-label="trending up" /> : <TrendingDown size={14} className="text-triple" aria-label="trending down" />)}
       </div>
       {sub && <div className="mt-1.5 text-[12px] font-medium text-ink-3">{sub}</div>}
     </div>
@@ -150,7 +150,7 @@ export function StatTile({ label, value, sub, tone, trend, className }: { label:
 export function EmptyState({ icon, title, body, action }: { icon?: ReactNode; title: string; body?: string; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center px-6 py-11 text-center">
-      {icon && <div className="mb-3 text-lime">{icon}</div>}
+      {icon && <div className="mb-3 text-live">{icon}</div>}
       <h3 className="display text-[22px]">{title}</h3>
       {body && <p className="mt-3 max-w-xs text-[14px] font-medium text-ink-2">{body}</p>}
       {action && <div className="mt-5">{action}</div>}
@@ -158,15 +158,15 @@ export function EmptyState({ icon, title, body, action }: { icon?: ReactNode; ti
   );
 }
 
-/* Score chips: under par is lime, par is quiet, over par is off-white, worse is filled. */
+/* Score chips: under par is mint, par is quiet, over par is off-white, worse is filled. Amber never colours a score. */
 const SCORE_CLASS: Record<ScoreLabel, string> = {
-  ace: "bg-lime text-on-lime rounded-[6px] ring-2 ring-inset ring-on-lime",
-  eagle: "bg-lime text-on-lime rounded-[6px] ring-2 ring-inset ring-on-lime/40",
-  birdie: "bg-lime text-on-lime rounded-[6px]",
+  ace: "bg-birdie text-bg rounded-[6px] ring-2 ring-inset ring-bg",
+  eagle: "bg-birdie text-bg rounded-[6px] ring-2 ring-inset ring-bg/40",
+  birdie: "bg-birdie text-bg rounded-[6px]",
   par: "bg-transparent text-ink border border-line-strong rounded-[6px]",
   bogey: "bg-transparent text-ink border-2 border-ink rounded-[6px]",
-  double: "bg-ink text-on-lime rounded-[6px]",
-  triple: "bg-triple text-on-lime rounded-[6px]",
+  double: "bg-ink text-bg rounded-[6px]",
+  triple: "bg-triple text-on-live rounded-[6px]",
   unscored: "bg-transparent text-ink-3 border border-line rounded-[6px]",
 };
 
@@ -184,7 +184,7 @@ export function Sheet({ open, onClose, title, children, tall }: { open: boolean;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label={title}>
       <button aria-label="Close" className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className={cx("relative w-full max-w-[480px] rounded-t-[14px] border-t border-lime bg-surface safe-bottom", tall ? "max-h-[92dvh]" : "max-h-[80dvh]", "flex flex-col")}>
+      <div className={cx("relative w-full max-w-[480px] rounded-t-[14px] border-t border-live bg-surface safe-bottom", tall ? "max-h-[92dvh]" : "max-h-[80dvh]", "flex flex-col")}>
         <div className="flex items-center justify-between px-[22px] pt-[22px] pb-[11px]">
           <h2 className="display text-[26px]">{title}</h2>
           <IconButton label="Close" onClick={onClose} className="-mr-2">
@@ -201,13 +201,13 @@ export function Toast({ message }: { message: string | null }) {
   if (!message) return null;
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-24 z-50 flex justify-center px-4">
-      <div className="rounded-[39px] bg-lime px-[22px] py-[11px] text-[13px] font-extrabold text-on-lime">{message}</div>
+      <div className="rounded-[39px] bg-live px-[22px] py-[11px] text-[13px] font-extrabold text-on-live">{message}</div>
     </div>
   );
 }
 
 export function Spinner({ className }: { className?: string }) {
-  return <span className={cx("inline-block h-5 w-5 animate-spin rounded-full border-2 border-line-strong border-t-lime", className)} aria-label="Loading" />;
+  return <span className={cx("inline-block h-5 w-5 animate-spin rounded-full border-2 border-line-strong border-t-live", className)} aria-label="Loading" />;
 }
 
 export function PageHeader({ title, back, right, sub }: { title: ReactNode; back?: () => void; right?: ReactNode; sub?: ReactNode }) {

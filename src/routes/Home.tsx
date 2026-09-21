@@ -64,7 +64,7 @@ export function HomeRoute() {
 
       {orphan && (
         <div className="mt-[22px] px-[22px]">
-          <div className="rounded-[14px] border border-lime bg-surface p-[22px]">
+          <div className="rounded-[14px] border border-live bg-surface p-[22px]">
             <div className="display text-[24px]">
               {orphan.count} {orphan.count === 1 ? "round lists" : "rounds list"} “{orphan.player.name}”, not you
             </div>
@@ -90,22 +90,22 @@ export function HomeRoute() {
 
       <div className="mt-[22px] px-[22px]">
         {live ? (
-          <button onClick={() => nav(`/rounds/${live.id}/play`)} className="block w-full rounded-[39px] bg-lime px-[22px] py-[22px] text-left text-on-lime active:bg-lime-2">
+          <button onClick={() => nav(`/rounds/${live.id}/play`)} className="block w-full rounded-[39px] bg-live px-[22px] py-[22px] text-left text-on-live active:bg-live-2">
             <div className="flex items-center justify-between">
               <span className="label flex items-center gap-2">
-                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-on-lime" /> Live round
+                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-on-live" /> Live round
               </span>
               <ChevronRight size={20} />
             </div>
             <div className="display mt-[11px] truncate text-[30px]">{live.courseName}</div>
-            {live.layoutName && <div className="label mt-1 text-ink-3">{live.layoutName}</div>}
+            {live.layoutName && <div className="label mt-1 text-on-live opacity-70">{live.layoutName}</div>}
             <div className="mt-[22px] flex items-end justify-between gap-[11px]">
               <div className="flex flex-wrap gap-1.5">
                 {live.playerIds.map((id) => {
                   const p = players.find((x) => x.id === id);
                   const t = liveTotals?.get(id);
                   return (
-                    <span key={id} className="label rounded-[39px] border border-on-lime/40 px-2.5 py-1.5">
+                    <span key={id} className="label rounded-[39px] border border-on-live/40 px-2.5 py-1.5">
                       {p?.name.split(" ")[0] ?? "?"} {t && t.holesScored ? formatToPar(t.toPar) : "–"}
                     </span>
                   );
@@ -137,7 +137,7 @@ export function HomeRoute() {
         className="mt-[44px]"
         action={
           finished.length > 0 && (
-            <button className="label text-lime" onClick={() => nav("/rounds")}>
+            <button className="label text-live" onClick={() => nav("/rounds")}>
               All rounds
             </button>
           )
@@ -168,7 +168,7 @@ export function HomeRoute() {
 function Quick({ label, value, good }: { label: string; value: string | number; good?: boolean }) {
   return (
     <div className="px-[11px] text-center">
-      <div className={cx("display numeric text-[26px]", good && "text-lime")}>{value}</div>
+      <div className={cx("display numeric text-[26px]", good && "text-live")}>{value}</div>
       <div className="label mt-2 text-ink-3">{label}</div>
     </div>
   );
