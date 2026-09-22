@@ -17,9 +17,9 @@ const VARIANT: Record<Variant, string> = {
   danger: "bg-danger text-danger-ink hover:opacity-90",
 };
 const SIZE: Record<Size, string> = {
-  sm: "h-9 px-3.5 text-[12px] font-extrabold rounded-[39px] gap-1.5",
-  md: "h-11 px-5 text-[13px] font-extrabold rounded-[39px] gap-2",
-  lg: "h-14 px-6 text-[15px] font-extrabold rounded-[39px] gap-2",
+  sm: "h-9 px-3.5 text-[12px] font-bold rounded-[39px] gap-1.5",
+  md: "h-11 px-5 text-[13px] font-bold rounded-[39px] gap-2",
+  lg: "h-14 px-6 text-[15px] font-bold rounded-[39px] gap-2",
 };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -32,7 +32,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   return (
     <button
       ref={ref}
-      className={cx("inline-flex items-center justify-center uppercase tracking-[0.03em] transition-colors duration-150 ease select-none disabled:opacity-40 disabled:pointer-events-none", VARIANT[variant], SIZE[size], full && "w-full", className)}
+      className={cx("inline-flex items-center justify-center transition-colors duration-150 ease select-none disabled:opacity-40 disabled:pointer-events-none", VARIANT[variant], SIZE[size], full && "w-full", className)}
       {...rest}
     />
   );
@@ -92,7 +92,7 @@ export function Segmented<T extends string>({ value, onChange, options, classNam
           role="tab"
           aria-selected={o.value === value}
           onClick={() => onChange(o.value)}
-          className={cx("label h-8 rounded-[39px] px-3.5 uppercase transition-colors duration-150 ease", o.value === value ? "bg-live text-on-live" : "text-ink-2")}
+          className={cx("label h-8 rounded-[39px] px-3.5 transition-colors duration-150 ease", o.value === value ? "bg-live text-on-live" : "text-ink-2")}
         >
           {o.label}
         </button>
@@ -108,7 +108,7 @@ export function Chip({ active, children, onClick, className }: { active?: boolea
       onClick={onClick}
       aria-pressed={active}
       className={cx(
-        "label inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[39px] border px-3.5 uppercase transition-colors duration-150 ease",
+        "label inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[39px] border px-3.5 transition-colors duration-150 ease",
         active ? "border-live bg-live text-on-live" : "border-line-strong bg-transparent text-ink hover:bg-surface-2",
         className,
       )}
@@ -127,7 +127,7 @@ export function Avatar({ name, color, size = 36, className }: { name: string; co
     .join("");
   void color;
   return (
-    <span aria-hidden className={cx("inline-grid shrink-0 place-items-center rounded-[6px] border border-line-strong bg-surface-2 font-extrabold text-ink", className)} style={{ width: size, height: size, fontSize: size * 0.36 }}>
+    <span aria-hidden className={cx("inline-grid shrink-0 place-items-center rounded-[6px] border border-line-strong bg-surface-2 font-bold text-ink", className)} style={{ width: size, height: size, fontSize: size * 0.36 }}>
       {initials}
     </span>
   );
@@ -173,7 +173,7 @@ const SCORE_CLASS: Record<ScoreLabel, string> = {
 export function ScoreCell({ strokes, par, size = 30, className }: { strokes: number; par: number; size?: number; className?: string }) {
   const label = scoreLabel(strokes, par);
   return (
-    <span title={label} className={cx("numeric inline-grid place-items-center font-extrabold", SCORE_CLASS[label], className)} style={{ width: size, height: size, fontSize: size * 0.46 }}>
+    <span title={label} className={cx("numeric inline-grid place-items-center font-bold", SCORE_CLASS[label], className)} style={{ width: size, height: size, fontSize: size * 0.46 }}>
       {strokes > 0 ? strokes : "–"}
     </span>
   );
@@ -201,7 +201,7 @@ export function Toast({ message }: { message: string | null }) {
   if (!message) return null;
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-24 z-50 flex justify-center px-4">
-      <div className="rounded-[39px] bg-live px-[22px] py-[11px] text-[13px] font-extrabold text-on-live">{message}</div>
+      <div className="rounded-[39px] bg-live px-[22px] py-[11px] text-[13px] font-bold text-on-live">{message}</div>
     </div>
   );
 }

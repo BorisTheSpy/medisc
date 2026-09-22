@@ -27,7 +27,7 @@ export function RoundRow({ round, scores, players, meId, onClick, subtitle }: { 
   return (
     <button onClick={onClick} className="flex w-full items-center gap-[11px] border-b hairline px-[22px] py-[15px] text-left last:border-b-0 active:bg-surface-2">
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[15px] font-extrabold text-ink">
+        <div className="truncate text-[15px] font-bold text-ink">
           {round.courseName}
           {round.layoutName && <span className="font-semibold text-ink-3"> · {round.layoutName}</span>}
         </div>

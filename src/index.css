@@ -3,19 +3,19 @@
 
 /* Self-hosted so a first launch with no signal still gets the real faces. */
 @font-face {
-  font-family: "Young Serif";
+  font-family: "Fraunces";
   font-style: normal;
-  font-weight: 400;
+  font-weight: 400 700;
   font-display: swap;
-  src: url("/fonts/young-serif.woff2") format("woff2");
+  src: url("/fonts/fraunces.woff2") format("woff2");
 }
 
 @font-face {
-  font-family: "Mona Sans";
+  font-family: "Nunito Sans";
   font-style: normal;
   font-weight: 400 800;
   font-display: swap;
-  src: url("/fonts/mona-sans.woff2") format("woff2");
+  src: url("/fonts/nunito-sans.woff2") format("woff2");
 }
 
 /* Medisc visual system: a night-blue field, blue hairlines for structure, amber for everything live,
@@ -59,8 +59,8 @@
 }
 
 @theme inline {
-  --font-sans: "Mona Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-display: "Young Serif", Georgia, "Times New Roman", serif;
+  --font-sans: "Nunito Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
   --color-bg: var(--bg);
   --color-bg-deep: var(--bg-deep);
   --color-surface: var(--surface);
@@ -124,19 +124,21 @@ textarea {
   caret-color: var(--live);
 }
 
-/* Display voice: heavy serif, set tight like a timing screen headline. */
+/* Display voice: a soft, warm serif with room to breathe. Optical size follows the set size. */
 .display {
   font-family: var(--font-display);
-  font-weight: 400;
-  letter-spacing: -0.02em;
-  line-height: 0.85;
+  font-weight: 500;
+  font-optical-sizing: auto;
+  font-variation-settings: "SOFT" 100;
+  letter-spacing: -0.01em;
+  line-height: 1;
 }
 
-/* Small heavy labels: the system's 12px / 800 meta voice. */
+/* Small labels: 11px / 700, sentence case, a little air between letters. */
 .label {
   font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+  font-weight: 700;
+  letter-spacing: 0.03em;
   line-height: 1;
 }
 
@@ -247,7 +249,7 @@ textarea {
   display: grid;
   place-items: center;
   font-family: var(--font-sans);
-  font-weight: 800;
+  font-weight: 700;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   border: 2px solid #0c1a2c;

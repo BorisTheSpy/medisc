@@ -3,13 +3,6 @@
   "detector": {
     "ignoreRules": [],
     "ignoreFiles": [],
-    "ignoreValues": [
-      {
-        "rule": "overused-font",
-        "value": "mona sans",
-        "createdAt": "2026-09-18T20:10:38.320Z",
-        "reason": "user pinned the Lando Norris design system, whose body face is Mona Sans Variable; brief wins"
-      }
-    ]
+    "ignoreValues": []
   }
 }

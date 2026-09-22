@@ -1,6 +1,6 @@
 ---
 name: Medisc
-description: A timing screen for a disc golf card; a night-blue field with blue hairlines, amber for everything live, mint only for under par, a heavy serif shouting the numbers.
+description: A timing screen for a disc golf card; a night-blue field with blue hairlines, amber for everything live, mint only for under par, a soft serif carrying the numbers.
 colors:
   night-ground: "#0c1a2c"
   night-deep: "#07101c"
@@ -21,53 +21,53 @@ colors:
   signal-red: "#ff6a52"
 typography:
   display:
-    fontFamily: "Young Serif, Georgia, Times New Roman, serif"
+    fontFamily: "Fraunces, Georgia, Times New Roman, serif"
     fontSize: "84px"
-    fontWeight: 400
-    lineHeight: 0.8
-    letterSpacing: "-0.02em"
+    fontWeight: 500
+    lineHeight: 1
+    letterSpacing: "-0.01em"
   headline:
-    fontFamily: "Young Serif, Georgia, Times New Roman, serif"
+    fontFamily: "Fraunces, Georgia, Times New Roman, serif"
     fontSize: "46px"
-    fontWeight: 400
-    lineHeight: 0.85
-    letterSpacing: "-0.02em"
+    fontWeight: 500
+    lineHeight: 1
+    letterSpacing: "-0.01em"
   title:
-    fontFamily: "Young Serif, Georgia, Times New Roman, serif"
+    fontFamily: "Fraunces, Georgia, Times New Roman, serif"
     fontSize: "30px"
-    fontWeight: 400
-    lineHeight: 0.85
-    letterSpacing: "-0.02em"
+    fontWeight: 500
+    lineHeight: 1
+    letterSpacing: "-0.01em"
   subtitle:
-    fontFamily: "Young Serif, Georgia, Times New Roman, serif"
+    fontFamily: "Fraunces, Georgia, Times New Roman, serif"
     fontSize: "26px"
-    fontWeight: 400
-    lineHeight: 0.85
-    letterSpacing: "-0.02em"
+    fontWeight: 500
+    lineHeight: 1
+    letterSpacing: "-0.01em"
   body:
-    fontFamily: "Mona Sans, ui-sans-serif, system-ui, sans-serif"
+    fontFamily: "Nunito Sans, ui-sans-serif, system-ui, sans-serif"
     fontSize: "15px"
     fontWeight: 500
     lineHeight: 1.5
     letterSpacing: "normal"
   body-strong:
-    fontFamily: "Mona Sans, ui-sans-serif, system-ui, sans-serif"
+    fontFamily: "Nunito Sans, ui-sans-serif, system-ui, sans-serif"
     fontSize: "15px"
-    fontWeight: 800
+    fontWeight: 700
     lineHeight: 1.5
     letterSpacing: "normal"
   label:
-    fontFamily: "Mona Sans, ui-sans-serif, system-ui, sans-serif"
+    fontFamily: "Nunito Sans, ui-sans-serif, system-ui, sans-serif"
     fontSize: "11px"
-    fontWeight: 800
-    lineHeight: 1
-    letterSpacing: "0.02em"
-  button:
-    fontFamily: "Mona Sans, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "13px"
-    fontWeight: 800
+    fontWeight: 700
     lineHeight: 1
     letterSpacing: "0.03em"
+  button:
+    fontFamily: "Nunito Sans, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "13px"
+    fontWeight: 700
+    lineHeight: 1
+    letterSpacing: "normal"
 rounded:
   sm: "2px"
   md: "6px"
@@ -219,15 +219,15 @@ components:
 
 **Creative North Star: "The Timing Screen, at Night"**
 
-Medisc is a scorecard read with one hand free, so the world is built like a race-hub timing screen: a night-blue ground, navy panels stepped up in tone, blue hairlines for structure, and one working colour, amber, reserved for whatever is live right now. Under par gets its own colour, mint, because a birdie is news and should not share a tone with a button. Numbers are the content, set in a heavy humanist serif at sizes that read from arm's length; everything around them is small, dense, uppercase sans meta.
+Medisc is a scorecard read with one hand free, so the world is built like a race-hub timing screen: a night-blue ground, navy panels stepped up in tone, blue hairlines for structure, and one working colour, amber, reserved for whatever is live right now. Under par gets its own colour, mint, because a birdie is news and should not share a tone with a button. Numbers are the content, set in a heavy humanist serif at sizes that read from arm's length; everything around them is small, dense, sentence-case sans meta.
 
 The system is dark-only and flat. Depth is carried by tone (ground, panel, raised, pressed) and by sky-blue hairlines, never by drop shadows on the field. The ground carries one atmospheric touch: a cool glow at the top of the page that fades into the navy, so the field reads as depth rather than a slab. Corners run on a four-step scale, and the two extremes carry meaning: tight 6px corners for data cells and inputs, full 39px pills for anything the player is about to press. Motion is limited to two authored moments (the score strike and the hole overlay slide) and honours reduced-motion.
 
-The Lando Norris timing-screen structure was pinned as the source and its charcoal-and-lime palette was later rejected as too harsh; the colour world returned to the app's original deep blue with amber, now with mint and sky as working accents. Brier was replaced by the free Young Serif and the label face is Mona Sans.
+The Lando Norris timing-screen structure was pinned as the source and its charcoal-and-lime palette was later rejected as too harsh; the colour world returned to the app's original deep blue with amber, now with mint and sky as working accents. The typefaces were later softened at the owner's request: Fraunces replaced Fraunces and Nunito Sans replaced Nunito Sans.
 
 **Key Characteristics:**
 - Night-blue ground, navy panels, blue hairlines; amber means live, selected, or forward; mint means under par.
-- Heavy tight serif for every number and heading (line-height 0.8–0.85, tracking -0.02em); small 800-weight uppercase sans for labels.
+- Soft medium-weight serif for every number and heading (line-height 1, tracking -0.01em); small 700-weight sentence-case sans for labels.
 - Flat surfaces, tonal depth, sky hairlines at 18% alpha, one top-of-page glow; no drop shadows on the field.
 - 11px spacing base (11 / 22 / 33 / 44); single 480px mobile column.
 - Radii 2 / 6 / 14 / 39: data cells and inputs at 6, cards and sheets at 14, buttons and live panels at 39.
@@ -267,25 +267,27 @@ A navy field in four tones with chalk text, amber as the sole action colour, min
 
 ## Typography
 
-**Display Font:** Young Serif (with Georgia, Times New Roman, serif), self-hosted, single 400 weight
-**Body Font:** Mona Sans (with ui-sans-serif, system-ui), self-hosted variable 400–800
-**Label Font:** Mona Sans at 800, uppercase, 11–13px
+**Display Font:** Fraunces (with Georgia, Times New Roman, serif), self-hosted variable 400–700 with optical size and the SOFT axis at 100
+**Body Font:** Nunito Sans (with ui-sans-serif, system-ui), self-hosted variable 400–800
+**Label Font:** Nunito Sans at 700, sentence case, 11–13px
 
-**Character:** A heavy, slightly bookish serif doing the shouting, and a compact grotesque doing the whispering. The serif is never bolded (it has one weight) and never loosened; the sans is never lighter than 500. Numerals are tabular everywhere they can be compared.
+**Character:** A soft, rounded serif carrying the numbers at a medium weight, and a friendly rounded sans doing everything else. Nothing is set heavier than 700, nothing is shouted in capitals except the four tab names, and display lines have a full line-height so tall numerals sit in air rather than pressing on each other. Numerals are tabular everywhere they can be compared.
 
 ### Hierarchy
-- **Display** (400, 84px, line-height 0.8): the current hole number in the scorecard overlay. The Stats form figure uses 72px; the live score-to-par on Home uses 56px. These are the only sizes above 46.
-- **Headline** (400, 46px, line-height 0.85): the two-line greeting on Home. The scorecard stroke count is 44px; the stats best-round figure 40px; hole data (par, length, distance) 36px.
-- **Title** (400, 30px, line-height 0.85): page headers, the live panel's course name, round-row score numerals, stat-tile values.
-- **Subtitle** (400, 26px): section headings and sheet titles. 22–24px for empty-state and notice headings.
-- **Body** (500, 15px): default copy. Names and course titles in rows use body-strong (800, 15px). Explanatory copy inside panels is 14px at 500 in `chalk-2`.
-- **Label** (800, 11px, 0.02em, uppercase): every meta line, stat label, chip, segment and tab. Hints under fields are 12px at 500 in `chalk-3`.
-- **Button** (800, 12 / 13 / 15px by size, 0.03em, uppercase): the three button sizes.
+- **Display** (500, 84px, line-height 1): the current hole number in the scorecard overlay. The Stats form figure uses 72px; the live score-to-par on Home uses 56px. These are the only sizes above 46.
+- **Headline** (500, 46px, line-height 1): the two-line greeting on Home. The scorecard stroke count is 44px; the stats best-round figure 40px; hole data (par, length, distance) 36px.
+- **Title** (500, 30px, line-height 1): page headers, the live panel's course name, round-row score numerals, stat-tile values.
+- **Subtitle** (500, 26px): section headings and sheet titles. 22–24px for empty-state and notice headings.
+- **Body** (500, 15px): default copy. Names and course titles in rows use body-strong (700, 15px). Explanatory copy inside panels is 14px at 500 in `chalk-2`.
+- **Label** (700, 11px, 0.03em, sentence case): every meta line, stat label, chip and segment. The tab bar alone keeps uppercase. Hints under fields are 12px at 500 in `chalk-3`.
+- **Button** (700, 12 / 13 / 15px by size, sentence case, normal tracking): the three button sizes.
 
 ### Named Rules
-**The Serif Owns the Numbers Rule.** Any score, par, distance, count or heading is set in Young Serif with tabular numerals. The sans never carries a headline or a hero figure.
+**The Serif Owns the Numbers Rule.** Any score, par, distance, count or heading is set in Fraunces with tabular numerals. The sans never carries a headline or a hero figure.
 
-**The Tight Set Rule.** Display text is set at line-height 0.8–0.85 and tracking -0.02em without exception. No optical loosening at small sizes; drop to the sans instead.
+**The Soft Set Rule.** Display text is set at line-height 1 and tracking -0.01em with the SOFT axis at 100. No weight above 500 on the serif and none above 700 on the sans; emphasis comes from size, not from bolding.
+
+**The Sentence Case Rule.** Buttons, chips, segments and labels read as words, not as capitals. Uppercase survives only on the tab bar, where four short words need to hold their width.
 
 ## Layout
 
@@ -321,7 +323,7 @@ Borders are hairlines: 1px chalk at 22% on outlined controls and par cells, 1px 
 ## Components
 
 ### Buttons
-- **Character:** flat pills, uppercase heavy sans, colour-only state change in 150ms.
+- **Character:** flat pills, sentence-case sans, colour-only state change in 150ms.
 - **Shape:** full pill (39px) at all three heights: 36px small (12px type, 14px side padding), 44px medium (13px, 20px), 56px large (15px, 24px). Icon buttons are 40px circles.
 - **Primary:** amber fill, dark text; hover and active shift to amber-2. Used for the single forward action on a screen: Start a round, Next hole, Finish, the plus stroke, Play.
 - **Secondary (default):** navy-raised fill, chalk text, chalk hairline; hover and active step to navy-pressed. Previous hole, cancel, open.
@@ -359,12 +361,12 @@ A 30px square (or scaled) with 6px corners and a heavy tabular numeral at 46% of
 The scorecard's masthead is a amber panel with 14px corners and 11px side margins: "Hole" as a label over an 84px serif numeral at line-height 0.8, with par, length and distance-to-basket as 36px serif figures under their labels to the right, a row of navy-outlined 32px pill chips (Tee here, Basket here) and the GPS accuracy as a 70% label. On each hole change it slides in from 12px left over 260ms with an ease-out-expo curve; reduced motion disables it. Beneath it the hole strip is a scrolling row of 32px circles: amber fill for the current hole, amber outline for scored holes, chalk hairline for the rest.
 
 ### Map Markers
-Tee markers are 26px amber circles with a 2px dark ring and an 800-weight 12px number; basket markers invert to navy with a amber ring and amber numeral; the active marker scales 1.25 and swaps its ring to chalk. Hole lines are dashed amber (chalk when inactive) over an 85% navy casing. The user dot is a 16px amber circle with a 3px navy ring and a amber halo.
+Tee markers are 26px amber circles with a 2px dark ring and an 700-weight 12px number; basket markers invert to navy with a amber ring and amber numeral; the active marker scales 1.25 and swaps its ring to chalk. Hole lines are dashed amber (chalk when inactive) over an 85% navy casing. The user dot is a 16px amber circle with a 3px navy ring and a amber halo.
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** set every number and heading in Young Serif at 400 with tabular numerals, line-height 0.8–0.85 and -0.02em tracking.
+- **Do** set every number and heading in Fraunces at 400 with tabular numerals, line-height 0.8–0.85 and -0.02em tracking.
 - **Do** put navy (`on-amber`) text and outlines on any amber surface, including chips and dots inside it.
 - **Do** use amber for exactly the live, selected, under-par or forward element on a screen and nothing else.
 - **Do** separate rows with a sky hairline at 16% and separate layers with a tone step or a amber top edge.

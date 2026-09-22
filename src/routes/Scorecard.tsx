@@ -181,7 +181,7 @@ export function ScorecardRoute() {
             <ChevronLeft size={24} />
           </IconButton>
           <div className="min-w-0 flex-1 px-1">
-            <div className="truncate text-[14px] font-extrabold">
+            <div className="truncate text-[14px] font-bold">
               {round.courseName}
               {round.layoutName && <span className="font-semibold text-ink-3"> · {round.layoutName}</span>}
             </div>
@@ -226,14 +226,14 @@ export function ScorecardRoute() {
           <div className="mt-[11px] flex items-center gap-2">
             <button
               onClick={() => markHere("tee")}
-              className={cx("label flex h-8 items-center gap-1 rounded-[39px] border-2 border-on-live px-3 uppercase", hole?.tee ? "bg-on-live text-live" : "bg-transparent text-on-live")}
+              className={cx("label flex h-8 items-center gap-1 rounded-[39px] border-2 border-on-live px-3", hole?.tee ? "bg-on-live text-live" : "bg-transparent text-on-live")}
               aria-label={hole?.tee ? "Re-mark tee at my position" : "Mark tee at my position"}
             >
               <Crosshair size={12} /> {hole?.tee ? "Tee set" : "Tee here"}
             </button>
             <button
               onClick={() => markHere("basket")}
-              className={cx("label flex h-8 items-center gap-1 rounded-[39px] border-2 border-on-live px-3 uppercase", hole?.basket ? "bg-on-live text-live" : "bg-transparent text-on-live")}
+              className={cx("label flex h-8 items-center gap-1 rounded-[39px] border-2 border-on-live px-3", hole?.basket ? "bg-on-live text-live" : "bg-transparent text-on-live")}
               aria-label={hole?.basket ? "Re-mark basket at my position" : "Mark basket at my position"}
             >
               <Crosshair size={12} /> {hole?.basket ? "Basket set" : "Basket here"}
@@ -247,7 +247,7 @@ export function ScorecardRoute() {
               key={n}
               onClick={() => setIdx(i)}
               className={cx(
-                "numeric h-8 w-8 shrink-0 rounded-full border-2 text-[12px] font-extrabold transition-colors duration-150 ease",
+                "numeric h-8 w-8 shrink-0 rounded-full border-2 text-[12px] font-bold transition-colors duration-150 ease",
                 i === idx ? "border-live bg-live text-on-live" : holesComplete.has(n) ? "border-live bg-transparent text-live" : "border-line-strong bg-transparent text-ink-3",
               )}
               aria-current={i === idx ? "step" : undefined}
@@ -276,7 +276,7 @@ export function ScorecardRoute() {
                 <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => round.trackThrows && setTrackerFor(p.id)} aria-label={round.trackThrows ? `Track throws for ${p.name}` : p.name}>
                   <Avatar name={p.name} color={p.color} size={38} />
                   <div className="min-w-0">
-                    <div className="truncate text-[15px] font-extrabold">{p.name}</div>
+                    <div className="truncate text-[15px] font-bold">{p.name}</div>
                     <div className="label numeric mt-1.5 text-ink-3">
                       {t && t.holesScored > 0 ? (
                         <>
@@ -545,7 +545,7 @@ function ThrowTracker({ score, par, onDone }: { score: HoleScore; par: number; o
               <div className="text-[11px] text-ink-3">{z.hint}</div>
             </button>
           ))}
-          <button onClick={() => add("basket")} className="label col-span-2 rounded-[39px] bg-live px-3 py-[15px] text-center text-[14px] uppercase text-on-live active:bg-live-2">
+          <button onClick={() => add("basket")} className="label col-span-2 rounded-[39px] bg-live px-3 py-[15px] text-center text-[14px] text-on-live active:bg-live-2">
             In the basket
           </button>
         </div>
