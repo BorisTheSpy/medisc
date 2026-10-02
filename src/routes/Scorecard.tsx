@@ -13,6 +13,9 @@ import { Avatar, Button, Field, IconButton, Sheet, Spinner, Toast, cx } from "@/
 import { CourseMap } from "@/map/CourseMap";
 import { AceParty, type Ace } from "@/celebration/AceParty";
 import { startAceAudio } from "@/celebration/aceAudio";
+import { useUser } from "@/services/auth";
+import { startLivePolling } from "@/services/sync";
+import { isSharedRound } from "@/domain/sync";
 
 const ZONES: { zone: Zone; label: string; hint: string }[] = [
   { zone: "fairway", label: "Fairway", hint: "In play, outside circle 2" },
@@ -138,6 +141,15 @@ export function ScorecardRoute() {
   }, [order, scores]);
   const allDone = order.length > 0 && order.every((n) => holesComplete.has(n));
 
+  // A card with another account on it is live: poll while this screen is open so both phones agree.
+  const user = useUser();
+  const accountIds = useMemo(() => new Set(players.filter((p) => p.username).map((p) => p.id)), [players]);
+  const shared = !!round && !!user && isSharedRound(round, accountIds, user.id);
+  useEffect(() => {
+    if (!shared) return;
+    return startLivePolling(4000);
+  }, [shared]);
+
   useEffect(() => {
     if (id) {
       try {
@@ -202,6 +214,7 @@ export function ScorecardRoute() {
             </div>
             <div className="label mt-1 text-ink-3">
               {holesComplete.size} of {order.length} holes scored
+              {shared && <span className="text-live"> · live</span>}
             </div>
           </div>
           <IconButton label={showMap ? "Hide map" : "Show map"} onClick={() => setShowMap((v) => !v)} className={cx(showMap && "bg-surface-2 text-live")}>
@@ -394,6 +407,7 @@ export function ScorecardRoute() {
               .map((p) => (
                 <Button key={p.id} size="sm" onClick={() => addPlayerToRound(round, p.id)}>
                   <Plus size={14} /> {p.name}
+                  {p.username && <span className="text-ink-3">@{p.username}</span>}
                 </Button>
               ))}
           </div>

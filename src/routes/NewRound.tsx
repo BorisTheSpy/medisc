@@ -159,6 +159,7 @@ export function NewRoundRoute() {
           {recent.map((p) => (
             <Chip key={p.id} active={selected.includes(p.id)} onClick={() => toggle(p.id)}>
               <Avatar name={p.name} color={p.color} size={20} /> {p.name}
+              {p.username && <span className="normal-case opacity-60">@{p.username}</span>}
               {selected.includes(p.id) ? <Check size={14} /> : null}
             </Chip>
           ))}

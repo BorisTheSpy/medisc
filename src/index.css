@@ -371,7 +371,68 @@ textarea {
   border-color: #eef3fa;
 }
 
+/* Marker wrappers carry MapLibre's own transform, so the marker inside is free to scale and clip. */
+.marker-wrap {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
+}
+
+/* Tee pad: a rectangle with a pointed end aimed at the basket. Dark outer, amber inner, upright number. */
+.hole-marker.tee.pad {
+  position: relative;
+  width: 24px;
+  height: 32px;
+  border: 0;
+  border-radius: 4px;
+  box-shadow: none;
+  padding: 0;
+  background: #0c1a2c;
+  clip-path: polygon(50% 0, 100% 24%, 100% 100%, 0 100%, 0 24%);
+}
+
+.hole-marker.tee.pad .pad-fill {
+  position: absolute;
+  inset: 2px;
+  background: var(--live);
+  clip-path: polygon(50% 0, 100% 24%, 100% 100%, 0 100%, 0 24%);
+}
+
+.hole-marker.tee.pad .pad-num {
+  position: relative;
+  display: block;
+  margin-top: 7px;
+  line-height: 1;
+}
+
+.hole-marker.tee.pad.active {
+  background: #eef3fa;
+}
+
+/* The player: a dot with a cone in front showing which way the phone faces. */
+.user-marker {
+  position: relative;
+  width: 16px;
+  height: 16px;
+}
+
+.user-cone {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: 50%;
+  width: 72px;
+  height: 72px;
+  transform: translateX(-50%);
+  background: conic-gradient(from -28deg at 50% 100%, rgba(255, 179, 64, 0.55) 0deg, rgba(255, 179, 64, 0.1) 56deg, transparent 56deg);
+  clip-path: circle(72px at 50% 100%);
+  pointer-events: none;
+}
+
+.user-marker.has-heading .user-cone {
+  display: block;
+}
+
 .user-dot {
+  display: block;
   width: 16px;
   height: 16px;
   border-radius: 50%;

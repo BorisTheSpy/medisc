@@ -1,23 +1,49 @@
 import { db } from "@/db/db";
-import { getSetting, setSetting, mergePlayerInto, uuid } from "@/db/repo";
+import { getSetting, setSetting, mergePlayerInto, uuid, PLAYER_COLORS } from "@/db/repo";
 import { getToken, getUser, sessionExpired, type User } from "./auth";
+import { mergeRoundDocs, toRoundDoc, type Person, type RoundDoc } from "@/domain/sync";
 import type { Course, HoleScore, Player, Round } from "@/domain/types";
-
-type RoundDoc = Round & { scores: HoleScore[] };
 
 const SINCE_KEY = "sync.since";
 let timer: number | null = null;
 let running: Promise<void> | null = null;
 let hooksInstalled = false;
 
+/** Scorecards open on a shared round. While any are, writes sync sooner and the server is polled. */
+let liveWatchers = 0;
+let liveTimer: number | null = null;
+
 /** Schedule a sync shortly after any local write. */
-export function scheduleSync(delayMs = 2500): void {
+export function scheduleSync(delayMs = liveWatchers > 0 ? 800 : 2500): void {
   if (!getToken()) return;
   if (timer) window.clearTimeout(timer);
   timer = window.setTimeout(() => {
     timer = null;
     syncNow().catch(() => {});
   }, delayMs);
+}
+
+/**
+ * Poll the server while a shared scorecard is open, so a cardmate's taps show up within a few
+ * seconds. Returns a function that stops polling for this caller.
+ */
+export function startLivePolling(intervalMs = 4000): () => void {
+  liveWatchers++;
+  const tick = () => {
+    if (document.visibilityState !== "visible" || navigator.onLine === false) return;
+    syncNow().catch(() => {});
+  };
+  if (liveWatchers === 1) {
+    tick();
+    liveTimer = window.setInterval(tick, intervalMs);
+  }
+  return () => {
+    liveWatchers = Math.max(0, liveWatchers - 1);
+    if (liveWatchers === 0 && liveTimer !== null) {
+      window.clearInterval(liveTimer);
+      liveTimer = null;
+    }
+  };
 }
 
 /** Dexie hooks so every write to rounds, scores or players triggers a sync. */
@@ -52,14 +78,20 @@ export async function adoptAccount(user: User): Promise<void> {
   await syncNow(true);
 }
 
+/** Friends are other accounts' players: never pushed under my account, or the server would refuse theirs. */
+function isForeignAccount(p: Player, myId: string | undefined): boolean {
+  return !!p.username && p.id !== myId;
+}
+
 async function collectChanges(since: number): Promise<{ players: Player[]; rounds: RoundDoc[] }> {
-  const players = (await db.players.toArray()).filter((p) => p.updatedAt > since || (p.deletedAt ?? 0) > since);
+  const myId = getUser()?.id;
+  const players = (await db.players.toArray()).filter((p) => (p.updatedAt > since || (p.deletedAt ?? 0) > since) && !isForeignAccount(p, myId));
   const changedScoreRounds = new Set((await db.holeScores.where("updatedAt").above(since).toArray()).map((s) => s.roundId));
   const rounds = (await db.rounds.toArray()).filter((r) => r.updatedAt > since || (r.deletedAt ?? 0) > since || changedScoreRounds.has(r.id));
   const docs: RoundDoc[] = [];
   for (const r of rounds) {
     const scores = await db.holeScores.where("roundId").equals(r.id).toArray();
-    docs.push({ ...r, scores, updatedAt: Math.max(r.updatedAt, r.deletedAt ?? 0, ...scores.map((s) => s.updatedAt)) });
+    docs.push(toRoundDoc(r, scores));
   }
   return { players, rounds: docs };
 }
@@ -80,27 +112,57 @@ async function ensureCourse(courseId: string, courseName: string): Promise<void>
   await db.courses.put(course);
 }
 
-async function applyRemote(players: Player[], rounds: RoundDoc[]): Promise<void> {
+function colorFor(id: string): string {
+  let h = 0;
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return PLAYER_COLORS[h % PLAYER_COLORS.length];
+}
+
+/** Make sure every account holder the server mentions exists locally as a player. */
+export async function ensurePeople(people: Person[]): Promise<void> {
+  const myId = getUser()?.id;
+  const now = Date.now();
+  for (const person of people) {
+    if (!person || typeof person.id !== "string" || person.id === myId) continue;
+    const name = person.name || person.displayName || person.username;
+    const local = await db.players.get(person.id);
+    if (!local) {
+      await db.players.put({ id: person.id, name, color: person.color || colorFor(person.id), username: person.username, isMe: false, createdAt: now, updatedAt: now });
+    } else if (local.name !== name || local.username !== person.username || (person.color && local.color !== person.color) || local.deletedAt) {
+      await db.players.put({ ...local, name, username: person.username, color: person.color || local.color, deletedAt: undefined, updatedAt: now });
+    }
+  }
+}
+
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+async function applyRound(doc: RoundDoc): Promise<void> {
+  const local = await db.rounds.get(doc.id);
+  await ensureCourse(doc.courseId, doc.courseName);
+  await db.transaction("rw", db.rounds, db.holeScores, async () => {
+    const localScores: HoleScore[] = local ? await db.holeScores.where("roundId").equals(doc.id).toArray() : [];
+    const merged = local ? mergeRoundDocs(toRoundDoc(local, localScores), doc) : doc;
+    const { scores, metaUpdatedAt, ...meta } = merged;
+    // The round's own time is its meta time; the document's max time is only the sync cursor.
+    const round: Round = { ...meta, updatedAt: metaUpdatedAt ?? meta.updatedAt };
+    if (!local || !same(local, round)) await db.rounds.put(round);
+    const keep = new Set(scores.map((s) => s.id));
+    const byId = new Map(localScores.map((s) => [s.id, s]));
+    for (const s of scores) {
+      const ls = byId.get(s.id);
+      if (!ls || !same(ls, s)) await db.holeScores.put(s);
+    }
+    for (const s of localScores) if (!keep.has(s.id)) await db.holeScores.delete(s.id);
+  });
+}
+
+async function applyRemote(players: Player[], rounds: RoundDoc[], people: Person[]): Promise<void> {
   for (const p of players) {
     const local = await db.players.get(p.id);
     if (!local || p.updatedAt >= local.updatedAt) await db.players.put({ ...p, isMe: p.id === getUser()?.id ? true : (local?.isMe ?? false) && !p.deletedAt });
   }
-  for (const doc of rounds) {
-    const { scores, ...round } = doc;
-    const local = await db.rounds.get(round.id);
-    if (local && local.updatedAt > round.updatedAt && !round.deletedAt) continue;
-    await ensureCourse(round.courseId, round.courseName);
-    await db.transaction("rw", db.rounds, db.holeScores, async () => {
-      await db.rounds.put(round);
-      const keep = new Set(scores.map((s) => s.id));
-      for (const s of scores) {
-        const ls = await db.holeScores.get(s.id);
-        if (!ls || s.updatedAt >= ls.updatedAt) await db.holeScores.put(s);
-      }
-      const stale = (await db.holeScores.where("roundId").equals(round.id).toArray()).filter((s) => !keep.has(s.id));
-      for (const s of stale) await db.holeScores.delete(s.id);
-    });
-  }
+  await ensurePeople(people);
+  for (const doc of rounds) await applyRound({ ...doc, scores: Array.isArray(doc.scores) ? doc.scores : [] });
 }
 
 export async function syncNow(full = false): Promise<void> {
@@ -120,8 +182,8 @@ export async function syncNow(full = false): Promise<void> {
       return;
     }
     if (!res.ok) throw new Error(`Sync failed (${res.status})`);
-    const json = (await res.json()) as { now: number; players: Player[]; rounds: RoundDoc[] };
-    await applyRemote(json.players, json.rounds);
+    const json = (await res.json()) as { now: number; players: Player[]; rounds: RoundDoc[]; people?: Person[] };
+    await applyRemote(json.players, json.rounds, json.people ?? []);
     await setSetting(SINCE_KEY, json.now);
   })().finally(() => {
     running = null;

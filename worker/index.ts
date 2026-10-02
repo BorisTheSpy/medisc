@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { mergeRoundDocs, type Person, type RoundDoc } from "../src/domain/sync";
 
 type Env = { ASSETS: Fetcher; GOOGLE_PLACES_KEY?: string; DB?: D1Database };
 
@@ -361,6 +362,9 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS sync_players_user ON sync_players (user_id, updated_at)`,
   `CREATE TABLE IF NOT EXISTS sync_rounds (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, payload TEXT NOT NULL, updated_at INTEGER NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS sync_rounds_user ON sync_rounds (user_id, updated_at)`,
+  `CREATE TABLE IF NOT EXISTS friends (user_id TEXT NOT NULL, friend_id TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (user_id, friend_id))`,
+  `CREATE TABLE IF NOT EXISTS round_members (round_id TEXT NOT NULL, user_id TEXT NOT NULL, PRIMARY KEY (round_id, user_id))`,
+  `CREATE INDEX IF NOT EXISTS round_members_user ON round_members (user_id)`,
 ];
 let schemaReady: Promise<void> | null = null;
 /** Idempotent, runs once per isolate. Lets the Worker deploy from git without a separate migration step. */
@@ -769,8 +773,93 @@ app.post("/api/auth/logout", async (c) => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// Sync: each round (with its hole scores) and each player is one JSON document owned by a user.
-// Last write wins by updated_at. Deletes are tombstones inside the document (deletedAt).
+// Friends: symmetric links between accounts. A friend on your card makes the round shared.
+// ---------------------------------------------------------------------------------------------
+
+interface PersonRow {
+  id: string;
+  username: string;
+  display_name: string;
+  payload: string | null;
+}
+
+function toPerson(r: PersonRow): Person {
+  let name: string | undefined;
+  let color: string | undefined;
+  if (r.payload) {
+    try {
+      const p = JSON.parse(r.payload) as { name?: unknown; color?: unknown };
+      if (typeof p.name === "string" && p.name.trim()) name = p.name.trim();
+      if (typeof p.color === "string") color = p.color;
+    } catch {
+      /* ignore a bad payload */
+    }
+  }
+  return { id: r.id, username: r.username, displayName: r.display_name, name, color };
+}
+
+const PERSON_SELECT = "SELECT u.id, u.username, u.display_name, p.payload FROM users u LEFT JOIN sync_players p ON p.id = u.id";
+
+async function listFriends(db: D1Database, userId: string): Promise<Person[]> {
+  const rows = await db.prepare(`${PERSON_SELECT} WHERE u.id IN (SELECT friend_id FROM friends WHERE user_id = ?) ORDER BY u.display_name LIMIT 200`).bind(userId).all<PersonRow>();
+  return rows.results.map(toPerson);
+}
+
+/** Friends plus everyone who shares a round with this user, so every phone can name every cardmate. */
+async function peopleFor(db: D1Database, userId: string): Promise<Person[]> {
+  const rows = await db
+    .prepare(
+      `${PERSON_SELECT} WHERE u.id != ?1 AND (
+         u.id IN (SELECT friend_id FROM friends WHERE user_id = ?1)
+         OR u.id IN (SELECT user_id FROM round_members WHERE round_id IN (SELECT round_id FROM round_members WHERE user_id = ?1))
+       ) LIMIT 300`,
+    )
+    .bind(userId)
+    .all<PersonRow>();
+  return rows.results.map(toPerson);
+}
+
+app.get("/api/friends", async (c) => {
+  const db = c.env.DB;
+  const user = await currentUser(c);
+  if (!db || !user) return c.json({ error: "Sign in first" }, 401);
+  return c.json({ friends: await listFriends(db, user.id) }, 200, { "Cache-Control": "no-store" });
+});
+
+app.post("/api/friends", async (c) => {
+  const db = c.env.DB;
+  const user = await currentUser(c);
+  if (!db || !user) return c.json({ error: "Sign in first" }, 401);
+  const body = await c.req.json<{ username?: string }>().catch(() => ({}) as { username?: string });
+  const username = String(body.username ?? "").trim().toLowerCase().replace(/^@/, "");
+  if (!USERNAME_RE.test(username)) return c.json({ error: "That is not a valid username." }, 400);
+  if (username === user.username) return c.json({ error: "That is you." }, 400);
+  const row = await db.prepare(`${PERSON_SELECT} WHERE u.username = ?`).bind(username).first<PersonRow>();
+  if (!row) return c.json({ error: "No account with that username." }, 404);
+  const now = Date.now();
+  await db.batch([
+    db.prepare("INSERT OR IGNORE INTO friends (user_id, friend_id, created_at) VALUES (?, ?, ?)").bind(user.id, row.id, now),
+    db.prepare("INSERT OR IGNORE INTO friends (user_id, friend_id, created_at) VALUES (?, ?, ?)").bind(row.id, user.id, now),
+  ]);
+  return c.json({ friend: toPerson(row) });
+});
+
+app.delete("/api/friends/:id", async (c) => {
+  const db = c.env.DB;
+  const user = await currentUser(c);
+  if (!db || !user) return c.json({ error: "Sign in first" }, 401);
+  const id = c.req.param("id");
+  await db.batch([
+    db.prepare("DELETE FROM friends WHERE user_id = ? AND friend_id = ?").bind(user.id, id),
+    db.prepare("DELETE FROM friends WHERE user_id = ? AND friend_id = ?").bind(id, user.id),
+  ]);
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Sync: each player is one JSON document owned by a user, last write wins. Each round is one
+// document owned by whoever started it and shared with every account on its card; writes from any
+// member are merged (round fields by round time, scores by score time). Deletes are tombstones.
 // ---------------------------------------------------------------------------------------------
 
 interface SyncDoc {
@@ -779,35 +868,91 @@ interface SyncDoc {
   [k: string]: unknown;
 }
 
+/** Which of these ids belong to real accounts. */
+async function accountIds(db: D1Database, ids: unknown[]): Promise<Set<string>> {
+  const uniq = [...new Set(ids.filter((x): x is string => typeof x === "string" && x.length > 0 && x.length <= 120))].slice(0, 50);
+  if (uniq.length === 0) return new Set();
+  const rows = await db
+    .prepare(`SELECT id FROM users WHERE id IN (${uniq.map(() => "?").join(",")})`)
+    .bind(...uniq)
+    .all<{ id: string }>();
+  return new Set(rows.results.map((r) => r.id));
+}
+
+function asRoundDoc(d: unknown): RoundDoc | null {
+  if (!d || typeof d !== "object") return null;
+  const r = d as Partial<RoundDoc>;
+  if (typeof r.id !== "string" || r.id.length === 0 || r.id.length > 120) return null;
+  if (!Array.isArray(r.playerIds) || !Array.isArray(r.holeNumbers)) return null;
+  return { ...(r as RoundDoc), scores: Array.isArray(r.scores) ? r.scores : [] };
+}
+
 app.post("/api/sync", async (c) => {
   const db = c.env.DB;
   const user = await currentUser(c);
   if (!db || !user) return c.json({ error: "Sign in to sync" }, 401);
-  const body = await c.req.json<{ since?: number; players?: SyncDoc[]; rounds?: SyncDoc[] }>().catch(() => ({}) as { since?: number; players?: SyncDoc[]; rounds?: SyncDoc[] });
+  const body = await c.req.json<{ since?: number; players?: SyncDoc[]; rounds?: unknown[] }>().catch(() => ({}) as { since?: number; players?: SyncDoc[]; rounds?: unknown[] });
   const since = isNum(body.since) ? body.since : 0;
   const now = Date.now();
-  const statements: D1PreparedStatement[] = [];
-  const upsert = (table: string, docs: SyncDoc[] | undefined) => {
-    for (const d of (docs ?? []).slice(0, 500)) {
-      if (!d || typeof d.id !== "string" || d.id.length > 120) continue;
-      const updatedAt = isNum(d.updatedAt) ? Math.min(d.updatedAt, now) : now;
-      const payload = JSON.stringify(d).slice(0, 200_000);
-      statements.push(
-        db
-          .prepare(`INSERT INTO ${table} (id, user_id, payload, updated_at) VALUES (?1, ?2, ?3, ?4)
-                    ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at
-                    WHERE ${table}.user_id = excluded.user_id AND excluded.updated_at >= ${table}.updated_at`)
-          .bind(d.id, user.id, payload, updatedAt),
-      );
+
+  const playerStatements: D1PreparedStatement[] = [];
+  for (const d of (body.players ?? []).slice(0, 500)) {
+    if (!d || typeof d.id !== "string" || d.id.length > 120) continue;
+    const updatedAt = isNum(d.updatedAt) ? Math.min(d.updatedAt, now) : now;
+    const payload = JSON.stringify(d);
+    if (payload.length > 200_000) continue;
+    playerStatements.push(
+      db
+        .prepare(`INSERT INTO sync_players (id, user_id, payload, updated_at) VALUES (?1, ?2, ?3, ?4)
+                  ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at
+                  WHERE sync_players.user_id = excluded.user_id AND excluded.updated_at >= sync_players.updated_at`)
+        .bind(d.id, user.id, payload, updatedAt),
+    );
+  }
+  if (playerStatements.length) await db.batch(playerStatements);
+
+  for (const raw of (body.rounds ?? []).slice(0, 500)) {
+    const incoming = asRoundDoc(raw);
+    if (!incoming) continue;
+    const row = await db.prepare("SELECT user_id, payload FROM sync_rounds WHERE id = ?").bind(incoming.id).first<{ user_id: string; payload: string }>();
+    let owner = user.id;
+    let merged = incoming;
+    if (row) {
+      owner = row.user_id;
+      if (owner !== user.id) {
+        const member = await db.prepare("SELECT 1 AS x FROM round_members WHERE round_id = ? AND user_id = ?").bind(incoming.id, user.id).first();
+        if (!member) continue;
+      }
+      let existing: RoundDoc | null = null;
+      try {
+        existing = asRoundDoc(JSON.parse(row.payload));
+      } catch {
+        /* unreadable: the incoming copy replaces it */
+      }
+      if (existing) {
+        merged = mergeRoundDocs(existing, incoming);
+        if (JSON.stringify(merged) === JSON.stringify(existing)) continue;
+      }
     }
-  };
-  upsert("sync_players", body.players);
-  upsert("sync_rounds", body.rounds);
-  if (statements.length) await db.batch(statements);
+    const payload = JSON.stringify(merged);
+    if (payload.length > 400_000) continue;
+    const members = await accountIds(db, merged.playerIds);
+    members.add(owner);
+    await db.batch([
+      db.prepare("INSERT INTO sync_rounds (id, user_id, payload, updated_at) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at").bind(incoming.id, owner, payload, now),
+      db.prepare("DELETE FROM round_members WHERE round_id = ?").bind(incoming.id),
+      ...[...members].map((uid) => db.prepare("INSERT OR IGNORE INTO round_members (round_id, user_id) VALUES (?, ?)").bind(incoming.id, uid)),
+    ]);
+  }
+
   const players = await db.prepare("SELECT payload FROM sync_players WHERE user_id = ? AND updated_at > ? ORDER BY updated_at LIMIT 2000").bind(user.id, since).all<{ payload: string }>();
-  const rounds = await db.prepare("SELECT payload FROM sync_rounds WHERE user_id = ? AND updated_at > ? ORDER BY updated_at LIMIT 2000").bind(user.id, since).all<{ payload: string }>();
+  const rounds = await db
+    .prepare("SELECT payload FROM sync_rounds WHERE updated_at > ?2 AND (user_id = ?1 OR id IN (SELECT round_id FROM round_members WHERE user_id = ?1)) ORDER BY updated_at LIMIT 2000")
+    .bind(user.id, since)
+    .all<{ payload: string }>();
+  const people = await peopleFor(db, user.id);
   const parse = (rows: { payload: string }[]) => rows.map((r) => JSON.parse(r.payload) as SyncDoc);
-  return c.json({ now, players: parse(players.results), rounds: parse(rounds.results) }, 200, { "Cache-Control": "no-store" });
+  return c.json({ now, players: parse(players.results), rounds: parse(rounds.results), people }, 200, { "Cache-Control": "no-store" });
 });
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));

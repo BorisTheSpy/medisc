@@ -2,9 +2,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { setWorkerUrl, Map as MLMap, Marker, LngLatBounds, type StyleSpecification, type GeoJSONSource } from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
-import { Crosshair, Layers } from "lucide-react";
+import { Compass, Crosshair, Layers } from "lucide-react";
 import type { Hole, LatLon } from "@/domain/types";
-import { haversineM } from "@/domain/geo";
+import { bearingDeg, haversineM } from "@/domain/geo";
+import { useCompass } from "@/services/useCompass";
 import { cx } from "@/components/ui";
 
 setWorkerUrl(workerUrl);
@@ -23,6 +24,8 @@ export const FALLBACK_STYLE: StyleSpecification = {
 
 export interface UserPosition extends LatLon {
   accuracy?: number;
+  /** GPS course in degrees, only meaningful while moving. The compass sensor takes priority. */
+  heading?: number | null;
 }
 
 export interface CourseMapProps {
@@ -115,6 +118,8 @@ export function CourseMap({ center, holes = [], activeHole, user, satellite = fa
   const mapRef = useRef<MLMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
   const userRef = useRef<Marker | null>(null);
+  const userElRef = useRef<HTMLDivElement | null>(null);
+  const compass = useCompass(user?.heading);
   const [ready, setReady] = useState(0);
   const [failed, setFailed] = useState<string | null>(null);
   const styleFailed = useRef(false);
@@ -183,22 +188,41 @@ export function CourseMap({ center, holes = [], activeHole, user, satellite = fa
     markersRef.current = [];
     for (const h of holes) {
       if (h.tee) {
+        // A tee with a basket is a pad that points down the fairway; the number stays upright.
+        const bearing = h.basket ? bearingDeg(h.tee, h.basket) : null;
+        const wrap = document.createElement("div");
+        wrap.className = "marker-wrap";
         const el = document.createElement("button");
-        el.className = cx("hole-marker tee", h.number === activeHole && "active");
-        el.textContent = String(h.number);
+        el.className = cx("hole-marker tee", bearing !== null && "pad", h.number === activeHole && "active");
+        if (bearing !== null) {
+          const fill = document.createElement("i");
+          fill.className = "pad-fill";
+          el.appendChild(fill);
+        }
+        const num = document.createElement("span");
+        num.className = "pad-num";
+        num.textContent = String(h.number);
+        if (bearing !== null) num.style.transform = `rotate(${-bearing}deg)`;
+        el.appendChild(num);
         el.setAttribute("aria-label", `Hole ${h.number} tee`);
         el.addEventListener("click", (e) => {
           e.stopPropagation();
           onHoleClickRef.current?.(h.number);
         });
-        markersRef.current.push(new Marker({ element: el }).setLngLat([h.tee.lon, h.tee.lat]).addTo(map));
+        wrap.appendChild(el);
+        const marker = new Marker({ element: wrap, rotationAlignment: "map", pitchAlignment: "map" }).setLngLat([h.tee.lon, h.tee.lat]);
+        if (bearing !== null) marker.setRotation(bearing);
+        markersRef.current.push(marker.addTo(map));
       }
       if (h.basket) {
+        const wrap = document.createElement("div");
+        wrap.className = "marker-wrap";
         const el = document.createElement("div");
         el.className = cx("hole-marker basket", h.number === activeHole && "active");
         el.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></svg>';
         el.setAttribute("aria-label", `Hole ${h.number} basket`);
-        markersRef.current.push(new Marker({ element: el }).setLngLat([h.basket.lon, h.basket.lat]).addTo(map));
+        wrap.appendChild(el);
+        markersRef.current.push(new Marker({ element: wrap }).setLngLat([h.basket.lon, h.basket.lat]).addTo(map));
       }
     }
   }, [holes, activeHole, ready]);
@@ -213,12 +237,27 @@ export function CourseMap({ center, holes = [], activeHole, user, satellite = fa
     }
     if (!userRef.current) {
       const el = document.createElement("div");
-      el.className = "user-dot";
-      userRef.current = new Marker({ element: el }).setLngLat([user.lon, user.lat]).addTo(map);
+      el.className = "user-marker";
+      el.innerHTML = '<i class="user-cone"></i><i class="user-dot"></i>';
+      userElRef.current = el;
+      userRef.current = new Marker({ element: el, rotationAlignment: "map", pitchAlignment: "map" }).setLngLat([user.lon, user.lat]).addTo(map);
     } else {
       userRef.current.setLngLat([user.lon, user.lat]);
     }
   }, [user, ready]);
+
+  // The cone in front of the dot turns with the phone.
+  useEffect(() => {
+    const marker = userRef.current;
+    const el = userElRef.current;
+    if (!marker || !el) return;
+    if (compass.heading === null) {
+      el.classList.remove("has-heading");
+      return;
+    }
+    el.classList.add("has-heading");
+    marker.setRotation(compass.heading);
+  }, [compass.heading, user, ready]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -288,6 +327,11 @@ export function CourseMap({ center, holes = [], activeHole, user, satellite = fa
         <button aria-label="Center on me" onClick={recenter} className="grid h-10 w-10 place-items-center rounded-full border border-line-strong bg-surface text-ink">
           <Crosshair size={18} />
         </button>
+        {compass.supported && compass.needsPermission && (
+          <button aria-label="Show which way I am facing" onClick={() => void compass.request()} className="grid h-10 w-10 place-items-center rounded-full border border-live bg-surface text-live">
+            <Compass size={18} />
+          </button>
+        )}
       </div>
       {children}
     </div>

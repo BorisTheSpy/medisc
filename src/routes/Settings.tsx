@@ -4,8 +4,10 @@ import { Download, Upload, Trash2 } from "lucide-react";
 import { useMe, useSetting } from "@/db/hooks";
 import { clearCaches, exportAll, importAll, setSetting, updatePlayer } from "@/db/repo";
 import type { Units } from "@/domain/geo";
-import { Button, Field, PageHeader, Section, Segmented, Toast } from "@/components/ui";
-import { LocateFixed, FileDown, LogOut, UserCheck, RefreshCw, PartyPopper } from "lucide-react";
+import { Button, Field, IconButton, PageHeader, Section, Segmented, Toast } from "@/components/ui";
+import { LocateFixed, FileDown, LogOut, UserCheck, RefreshCw, PartyPopper, UserMinus, UserPlus } from "lucide-react";
+import { addFriend, listFriends, removeFriend } from "@/services/friends";
+import type { Person } from "@/domain/sync";
 import { useUser, login, register, logout } from "@/services/auth";
 import { adoptAccount, syncNow } from "@/services/sync";
 import { usePlayers, useRounds } from "@/db/hooks";
@@ -57,6 +59,44 @@ export function SettingsRoute() {
   const [acctBusy, setAcctBusy] = useState(false);
   const [acctError, setAcctError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [friends, setFriends] = useState<Person[]>([]);
+  const [friendUser, setFriendUser] = useState("");
+  const [friendError, setFriendError] = useState<string | null>(null);
+  const [friendBusy, setFriendBusy] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      setFriends([]);
+      return;
+    }
+    listFriends()
+      .then(setFriends)
+      .catch(() => {});
+  }, [user]);
+
+  async function submitFriend(e: React.FormEvent) {
+    e.preventDefault();
+    const username = friendUser.trim().toLowerCase().replace(/^@/, "");
+    if (!username) return;
+    setFriendBusy(true);
+    setFriendError(null);
+    try {
+      const f = await addFriend(username);
+      setFriends((list) => (list.some((x) => x.id === f.id) ? list : [...list, f]));
+      setFriendUser("");
+      notify(`${f.name ?? f.displayName} is now a friend`);
+    } catch (err) {
+      setFriendError(err instanceof Error ? err.message : "Could not add that friend");
+    } finally {
+      setFriendBusy(false);
+    }
+  }
+
+  async function dropFriend(f: Person) {
+    if (!confirm(`Remove ${f.name ?? f.displayName} from your friends? Rounds you already share stay shared.`)) return;
+    await removeFriend(f.id);
+    setFriends((list) => list.filter((x) => x.id !== f.id));
+  }
 
   async function submitAccount(e: React.FormEvent) {
     e.preventDefault();
@@ -212,6 +252,36 @@ export function SettingsRoute() {
         )}
       </Section>
 
+      {user && (
+        <Section title="Friends" className="mt-6">
+          <p className="mb-2 text-xs text-ink-3">Friends are other Medisc accounts. Put a friend on your card and the round lands in their app too, with every score updating on both phones as you play.</p>
+          <form onSubmit={submitFriend} className="flex gap-2">
+            <Field name="friendUser" value={friendUser} onChange={(e) => setFriendUser(e.target.value.toLowerCase())} placeholder="Friend's username" autoCapitalize="none" autoCorrect="off" maxLength={25} className="flex-1" aria-label="Friend's username" />
+            <Button type="submit" variant="brand" className="h-12" disabled={friendBusy || !friendUser.trim()}>
+              <UserPlus size={16} /> Add
+            </Button>
+          </form>
+          {friendError && <p className="mt-2 text-sm text-danger">{friendError}</p>}
+          <div className="mt-2 overflow-hidden rounded-card bg-surface shadow-card">
+            {friends.map((f) => (
+              <div key={f.id} className="flex items-center gap-3 border-b hairline px-4 py-2.5 last:border-b-0">
+                <span className="inline-grid h-8 w-8 place-items-center rounded-full text-xs font-bold text-white" style={{ background: f.color ?? "#3F75BA" }}>
+                  {(f.name ?? f.displayName).slice(0, 2).toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium">{f.name ?? f.displayName}</div>
+                  <div className="text-xs text-ink-3">@{f.username}</div>
+                </div>
+                <IconButton label={`Remove ${f.name ?? f.displayName}`} onClick={() => dropFriend(f)}>
+                  <UserMinus size={18} />
+                </IconButton>
+              </div>
+            ))}
+            {friends.length === 0 && <div className="px-4 py-3 text-sm text-ink-3">No friends yet. Ask for their username and add it here.</div>}
+          </div>
+        </Section>
+      )}
+
       <Section title="Players" className="mt-6">
         <div className="overflow-hidden rounded-card bg-surface shadow-card">
           {players
@@ -223,11 +293,16 @@ export function SettingsRoute() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">{p.name}</div>
-                  <div className="text-xs text-ink-3">{roundsWith(p.id)} rounds together</div>
+                  <div className="text-xs text-ink-3">
+                    {p.username ? `@${p.username} · ` : ""}
+                    {roundsWith(p.id)} rounds together
+                  </div>
                 </div>
-                <Button size="sm" variant="ghost" onClick={() => thisIsMe(p.id)} title="Count this player's rounds as yours">
-                  <UserCheck size={14} /> This is me
-                </Button>
+                {!p.username && (
+                  <Button size="sm" variant="ghost" onClick={() => thisIsMe(p.id)} title="Count this player's rounds as yours">
+                    <UserCheck size={14} /> This is me
+                  </Button>
+                )}
               </div>
             ))}
           {players.filter((p) => !p.isMe).length === 0 && <div className="px-4 py-3 text-sm text-ink-3">No other players yet. Add them when you start a round.</div>}

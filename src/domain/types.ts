@@ -12,6 +12,8 @@ export interface Player extends Timestamps {
   color: string;
   isMe: boolean;
   lastPlayedAt?: number;
+  /** Set when this player is a Medisc account; the id is then their account id. */
+  username?: string;
 }
 
 export interface LatLon {
