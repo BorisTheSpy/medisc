@@ -6,7 +6,7 @@ built-in stand-in instead.
 
 | File                | Plays                                 | Stand-in when missing          |
 | ------------------- | ------------------------------------- | ------------------------------ |
-| `great-shot.mp3`    | first, the "Great shot" voice clip    | the phone's speech synthesis   |
+| `nice-shot.mp3`     | first, the "Nice shot" voice clip     | the phone's speech synthesis   |
 | `gangnam-style.mp3` | after the voice, until dismissed      | a synthesized party beat       |
 | `fart.mp3`          | over the song, every second or so     | a synthesized fart             |
 

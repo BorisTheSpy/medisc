@@ -1,5 +1,5 @@
 /**
- * The ace soundtrack: a "Great shot" voice clip, then the song with farts over it.
+ * The ace soundtrack: a "Nice shot" voice clip, then the song with farts over it.
  *
  * The owner drops their own recordings into public/ace/ (see the README there). When a file is
  * missing the app falls back to speech synthesis, a synthesized party beat, and synthesized farts,
@@ -7,7 +7,7 @@
  * the ace so mobile browsers allow playback.
  */
 
-const VOICE_SRC = "/ace/great-shot.mp3";
+const VOICE_SRC = "/ace/nice-shot.mp3";
 const SONG_SRC = "/ace/gangnam-style.mp3";
 const FART_SRC = "/ace/fart.mp3";
 
@@ -229,7 +229,7 @@ export function startAceAudio(): Stop {
       add(v.stop);
       voiceEnded = v.ended;
     } catch {
-      const v = speak("Great shot!");
+      const v = speak("Nice shot!");
       add(v.stop);
       voiceEnded = v.ended;
     }

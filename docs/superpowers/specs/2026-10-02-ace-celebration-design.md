@@ -1,7 +1,7 @@
 # Ace celebration
 
 When a player scores an ace (one stroke on a hole), the scorecard throws a party: confetti, a
-dancing figure, the words "Great Shot!!!", a "Great shot" voice clip, then a song with fart
+dancing figure, the words "Great Shot!!!", a "Nice shot" voice clip, then a song with fart
 sounds over it.
 
 ## Trigger
@@ -36,7 +36,7 @@ Order: voice clip, then song and farts together.
 
 | Slot  | File the owner drops in         | Fallback when missing                                   |
 | ----- | ------------------------------- | ------------------------------------------------------- |
-| Voice | `public/ace/great-shot.mp3`     | Speech synthesis says "Great shot!"                     |
+| Voice | `public/ace/nice-shot.mp3`      | Speech synthesis says "Nice shot!"                      |
 | Song  | `public/ace/gangnam-style.mp3`  | Synthesized four-on-the-floor party beat with a riff    |
 | Fart  | `public/ace/fart.mp3`           | Synthesized fart via Web Audio (wobbling low sawtooth)  |
 
