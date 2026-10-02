@@ -40,7 +40,8 @@ Order: voice clip, then song and farts together.
 | Song  | `public/ace/gangnam-style.mp3`  | Synthesized four-on-the-floor party beat with a riff    |
 | Fart  | `public/ace/fart.mp3`           | Synthesized fart via Web Audio (wobbling low sawtooth)  |
 
-Farts play at random intervals between 0.8 and 1.6 seconds while the song plays. The song and
+Farts play while the song does, every 0.35 to 1 second, mixing long rips, short barks and rapid-fire
+bursts of three to five. The file is pitch-shifted per fart so one clip covers every kind. The song and
 farts stop when the overlay closes. All audio is primed by the user gesture that caused the ace.
 
 The real recordings are copyrighted, so the repo never ships them. `public/ace/README.md`

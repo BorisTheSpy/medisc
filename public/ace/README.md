@@ -8,7 +8,7 @@ built-in stand-in instead.
 | ------------------- | ------------------------------------- | ------------------------------ |
 | `nice-shot.mp3`     | first, the "Nice shot" voice clip     | the phone's speech synthesis   |
 | `gangnam-style.mp3` | after the voice, until dismissed      | a synthesized party beat       |
-| `fart.mp3`          | over the song, every second or so     | a synthesized fart             |
+| `fart.mp3`          | over the song, long, barked and burst | a synthesized fart             |
 
 Keep each file under 8 MB so it is cached for offline play. Test with the Preview ace
 celebration button on the Settings screen.

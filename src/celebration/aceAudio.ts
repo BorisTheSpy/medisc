@@ -27,13 +27,18 @@ function audioContext(): AudioContext | null {
 }
 
 /** Play a file; resolve with a stop function once it starts, or reject if the file is missing. */
-function playFile(src: string, { loop = false, volume = 1, startAt = 0 } = {}): Promise<{ stop: Stop; ended: Promise<void> }> {
+function playFile(src: string, { loop = false, volume = 1, startAt = 0, rate = 1 } = {}): Promise<{ stop: Stop; ended: Promise<void> }> {
   return new Promise((resolve, reject) => {
     // A media fragment seeks before the first frame; the metadata hook covers browsers that ignore it.
     const el = new Audio(startAt > 0 ? `${src}#t=${startAt}` : src);
     el.loop = loop;
     el.volume = volume;
     el.preload = "auto";
+    if (rate !== 1) {
+      // Let the pitch follow the speed, so one clip becomes a whole family of farts.
+      el.playbackRate = rate;
+      (el as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = false;
+    }
     if (startAt > 0) {
       el.addEventListener(
         "loadedmetadata",
@@ -188,29 +193,88 @@ function synthBeat(ac: AudioContext): Stop {
   };
 }
 
-/** Farts at random intervals until stopped. Uses the file when present, the synth otherwise. */
+/** A short, sharp bark of a fart: higher, faster and over in a blink. */
+export function synthBarkFart(ac: AudioContext, at = ac.currentTime): void {
+  const dur = 0.08 + Math.random() * 0.1;
+  const osc = ac.createOscillator();
+  osc.type = "square";
+  const base = 110 + Math.random() * 90;
+  osc.frequency.setValueAtTime(base, at);
+  osc.frequency.exponentialRampToValueAtTime(base * 0.4, at + dur);
+
+  const filter = ac.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.frequency.setValueAtTime(600, at);
+  filter.Q.value = 2;
+
+  const gain = ac.createGain();
+  gain.gain.setValueAtTime(0.0001, at);
+  gain.gain.exponentialRampToValueAtTime(0.6, at + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+
+  osc.connect(filter).connect(gain).connect(ac.destination);
+  osc.start(at);
+  osc.stop(at + dur + 0.02);
+}
+
+type FartKind = "long" | "bark" | "burst";
+
+function pickKind(): FartKind {
+  const r = Math.random();
+  if (r < 0.4) return "bark";
+  if (r < 0.6) return "burst";
+  return "long";
+}
+
+/**
+ * Farts until stopped: long rips, short barks, and rapid-fire bursts, at random intervals.
+ * The file (when present) is pitch-shifted so one clip covers every kind; the synth covers the rest.
+ */
 function startFarts(ac: AudioContext | null): Stop {
   let timer = 0;
   let stopped = false;
   let useFile = true;
   let live: Stop[] = [];
 
+  async function fileFart(rate: number, volume: number) {
+    try {
+      const { stop } = await playFile(FART_SRC, { volume, rate });
+      live.push(stop);
+      return true;
+    } catch {
+      useFile = false;
+      return false;
+    }
+  }
+
+  async function play(kind: FartKind) {
+    if (stopped) return;
+    if (kind === "bark") {
+      const ok = useFile && (await fileFart(1.6 + Math.random() * 0.8, 0.9));
+      if (!ok && ac) synthBarkFart(ac);
+      return;
+    }
+    if (kind === "burst") {
+      const n = 3 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < n; i++) {
+        if (stopped) return;
+        const ok = useFile && (await fileFart(1.4 + Math.random() * 1.2, 0.8));
+        if (!ok && ac) synthBarkFart(ac);
+        await new Promise((r) => window.setTimeout(r, 90 + Math.random() * 80));
+      }
+      return;
+    }
+    const ok = useFile && (await fileFart(0.7 + Math.random() * 0.5, 1));
+    if (!ok && ac) synthFart(ac);
+  }
+
   async function one() {
     if (stopped) return;
-    if (useFile) {
-      try {
-        const { stop } = await playFile(FART_SRC, { volume: 0.9 });
-        live.push(stop);
-      } catch {
-        useFile = false;
-        if (ac) synthFart(ac);
-      }
-    } else if (ac) {
-      synthFart(ac);
-    }
-    timer = window.setTimeout(one, 800 + Math.random() * 800);
+    await play(pickKind());
+    if (stopped) return;
+    timer = window.setTimeout(one, 350 + Math.random() * 650);
   }
-  timer = window.setTimeout(one, 400);
+  timer = window.setTimeout(one, 300);
 
   return () => {
     stopped = true;
