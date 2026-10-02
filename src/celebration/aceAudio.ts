@@ -10,6 +10,8 @@
 const VOICE_SRC = "/ace/nice-shot.mp3";
 const SONG_SRC = "/ace/gangnam-style.mp3";
 const FART_SRC = "/ace/fart.mp3";
+/** The song skips its intro and drops straight into the hook. */
+const SONG_START_S = 70;
 
 type Stop = () => void;
 
@@ -25,12 +27,22 @@ function audioContext(): AudioContext | null {
 }
 
 /** Play a file; resolve with a stop function once it starts, or reject if the file is missing. */
-function playFile(src: string, { loop = false, volume = 1 } = {}): Promise<{ stop: Stop; ended: Promise<void> }> {
+function playFile(src: string, { loop = false, volume = 1, startAt = 0 } = {}): Promise<{ stop: Stop; ended: Promise<void> }> {
   return new Promise((resolve, reject) => {
-    const el = new Audio(src);
+    // A media fragment seeks before the first frame; the metadata hook covers browsers that ignore it.
+    const el = new Audio(startAt > 0 ? `${src}#t=${startAt}` : src);
     el.loop = loop;
     el.volume = volume;
     el.preload = "auto";
+    if (startAt > 0) {
+      el.addEventListener(
+        "loadedmetadata",
+        () => {
+          if (el.currentTime < startAt - 1) el.currentTime = startAt;
+        },
+        { once: true },
+      );
+    }
     const ended = new Promise<void>((done) => el.addEventListener("ended", () => done(), { once: true }));
     const stop = () => {
       el.pause();
@@ -238,7 +250,7 @@ export function startAceAudio(): Stop {
 
     // Then the song and the farts together.
     try {
-      const s = await playFile(SONG_SRC, { volume: 0.8 });
+      const s = await playFile(SONG_SRC, { volume: 0.8, startAt: SONG_START_S });
       add(s.stop);
     } catch {
       if (ac) add(synthBeat(ac));
