@@ -1,7 +1,7 @@
 import { db } from "./db";
 import type { Course, Hole, HoleScore, Layout, Player, Round, Zone } from "@/domain/types";
 import { MAIN_LAYOUT, holeId, layoutRowId } from "@/domain/layouts";
-import { strokesFromThrows, penaltiesFromThrows } from "@/domain/scoring";
+import { strokesFromThrows, penaltiesFromThrows, nextStrokes } from "@/domain/scoring";
 
 export const uuid = (): string =>
   typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -250,11 +250,7 @@ export async function setStrokes(scoreId: string, strokes: number): Promise<void
 export async function adjustStrokes(scoreId: string, delta: number): Promise<void> {
   const s = await db.holeScores.get(scoreId);
   if (!s) return;
-  if (s.strokes === 0) {
-    await setStrokes(scoreId, delta > 0 ? s.par : Math.max(1, s.par - 1));
-    return;
-  }
-  await setStrokes(scoreId, Math.max(1, s.strokes + delta));
+  await setStrokes(scoreId, nextStrokes(s.strokes, s.par, delta));
 }
 
 export async function setThrows(scoreId: string, throws: Zone[]): Promise<void> {

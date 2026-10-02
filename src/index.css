@@ -206,6 +206,105 @@ textarea {
   animation: overlay-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Ace party: confetti, a dancer and a big headline. Reduced motion stills the dancer. */
+@keyframes party-in {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.party-in {
+  animation: party-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes party-headline {
+  0%,
+  100% {
+    transform: rotate(-3deg) scale(1);
+  }
+  50% {
+    transform: rotate(3deg) scale(1.06);
+  }
+}
+
+.party-headline {
+  animation: party-headline 460ms ease-in-out infinite;
+}
+
+@keyframes dancer-gallop {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-4deg);
+  }
+  25% {
+    transform: translateY(-14px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(0) rotate(4deg);
+  }
+  75% {
+    transform: translateY(-14px) rotate(0deg);
+  }
+}
+
+@keyframes dancer-lasso {
+  0%,
+  100% {
+    transform: rotate(-20deg);
+  }
+  50% {
+    transform: rotate(25deg);
+  }
+}
+
+@keyframes dancer-reins {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes dancer-legs {
+  0%,
+  100% {
+    transform: scaleX(1);
+  }
+  50% {
+    transform: scaleX(0.9);
+  }
+}
+
+.dancer-body {
+  transform-origin: 100px 130px;
+  animation: dancer-gallop 910ms ease-in-out infinite;
+}
+
+.dancer-lasso {
+  transform-origin: 128px 82px;
+  animation: dancer-lasso 455ms ease-in-out infinite;
+}
+
+.dancer-reins {
+  animation: dancer-reins 455ms ease-in-out infinite;
+}
+
+.dancer-legs {
+  transform-origin: 100px 126px;
+  animation: dancer-legs 455ms ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

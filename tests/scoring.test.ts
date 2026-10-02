@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { toPar, scoreLabel, strokesFromThrows, penaltiesFromThrows, formatToPar, roundTotals, SCORE_LABELS } from "../src/domain/scoring";
+import { toPar, scoreLabel, strokesFromThrows, penaltiesFromThrows, formatToPar, roundTotals, nextStrokes, SCORE_LABELS } from "../src/domain/scoring";
 import type { HoleScore } from "../src/domain/types";
 
 const hs = (playerId: string, holeNumber: number, par: number, strokes: number): HoleScore => ({
@@ -51,5 +51,19 @@ describe("scoring", () => {
     const totals = roundTotals(scores);
     expect(totals.get("a")).toEqual({ strokes: 5, par: 6, toPar: -1, holesScored: 2 });
     expect(totals.get("b")).toEqual({ strokes: 7, par: 6, toPar: 1, holesScored: 2 });
+  });
+});
+
+describe("nextStrokes", () => {
+  it("sets par with + and a birdie with - on an unscored hole", () => {
+    expect(nextStrokes(0, 3, 1)).toBe(3);
+    expect(nextStrokes(0, 3, -1)).toBe(2);
+    expect(nextStrokes(0, 1, -1)).toBe(1);
+  });
+
+  it("moves one stroke at a time and never below one", () => {
+    expect(nextStrokes(3, 3, 1)).toBe(4);
+    expect(nextStrokes(2, 3, -1)).toBe(1);
+    expect(nextStrokes(1, 3, -1)).toBe(1);
   });
 });

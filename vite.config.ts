@@ -41,8 +41,8 @@ export default defineConfig({
       },
       workbox: {
         navigateFallbackDenylist: [/^\/api\//],
-        globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
-        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        globPatterns: ["**/*.{js,css,html,svg,png,woff2,mp3}"],
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/tiles\.openfreemap\.org\//,

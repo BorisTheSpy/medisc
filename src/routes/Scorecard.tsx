@@ -7,10 +7,12 @@ import { publishCourseNow } from "@/services/community";
 import { roundLayoutId } from "@/domain/layouts";
 import { useGeolocation } from "@/services/useGeolocation";
 import { formatHoleDistance, haversineM, type Units } from "@/domain/geo";
-import { formatToPar, roundTotals, scoreLabel, isHoledOut } from "@/domain/scoring";
+import { formatToPar, roundTotals, scoreLabel, isHoledOut, nextStrokes } from "@/domain/scoring";
 import type { HoleScore, Player, Zone } from "@/domain/types";
 import { Avatar, Button, Field, IconButton, Sheet, Spinner, Toast, cx } from "@/components/ui";
 import { CourseMap } from "@/map/CourseMap";
+import { AceParty, type Ace } from "@/celebration/AceParty";
+import { startAceAudio } from "@/celebration/aceAudio";
 
 const ZONES: { zone: Zone; label: string; hint: string }[] = [
   { zone: "fairway", label: "Fairway", hint: "In play, outside circle 2" },
@@ -68,10 +70,23 @@ export function ScorecardRoute() {
   const [holesOpen, setHolesOpen] = useState(false);
   const [holeCountInput, setHoleCountInput] = useState("");
   const toastTimer = useRef<number | null>(null);
+  const [ace, setAce] = useState<Ace | null>(null);
   function notify(msg: string) {
     setToast(msg);
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(null), 2600);
+  }
+
+  /** Throw the ace party. Called inside the tap so the browser lets the audio play. */
+  function celebrateAce(playerName: string) {
+    ace?.stopAudio();
+    setAce({ playerName, holeNumber, stopAudio: startAceAudio() });
+  }
+
+  /** One tap of + or −. An ace is predicted before the write so the party starts in the gesture. */
+  function tapStroke(s: HoleScore, p: Player, delta: number) {
+    if (s.strokes !== 1 && nextStrokes(s.strokes, s.par, delta) === 1) celebrateAce(p.name);
+    void adjustStrokes(s.id, delta);
   }
 
   /** Save the phone's current position as this hole's tee or basket, then share it. */
@@ -289,13 +304,13 @@ export function ScorecardRoute() {
                     </div>
                   </div>
                 </button>
-                <button aria-label={`Remove a stroke for ${p.name}`} onClick={() => adjustStrokes(s.id, -1)} disabled={s.strokes === 1} className="grid h-12 w-12 place-items-center rounded-full border-2 border-ink text-ink active:bg-surface-3 disabled:opacity-30">
+                <button aria-label={`Remove a stroke for ${p.name}`} onClick={() => tapStroke(s, p, -1)} disabled={s.strokes === 1} className="grid h-12 w-12 place-items-center rounded-full border-2 border-ink text-ink active:bg-surface-3 disabled:opacity-30">
                   <Minus size={22} strokeWidth={2.6} />
                 </button>
                 <div key={`${s.id}-${s.strokes}`} className={cx("display numeric strike w-14 text-center text-[44px]", label === "birdie" || label === "eagle" || label === "ace" ? "text-birdie" : label === "double" || label === "triple" ? "text-triple" : "text-ink")} aria-live="polite" aria-label={`${p.name} strokes`}>
                   {s.strokes > 0 ? s.strokes : "–"}
                 </div>
-                <button aria-label={`Add a stroke for ${p.name}`} onClick={() => adjustStrokes(s.id, 1)} className="grid h-12 w-12 place-items-center rounded-full bg-live text-on-live active:bg-live-2">
+                <button aria-label={`Add a stroke for ${p.name}`} onClick={() => tapStroke(s, p, 1)} className="grid h-12 w-12 place-items-center rounded-full bg-live text-on-live active:bg-live-2">
                   <Plus size={22} strokeWidth={2.6} />
                 </button>
               </div>
@@ -489,9 +504,10 @@ export function ScorecardRoute() {
       </Sheet>
 
       <Sheet open={!!trackerFor && !!trackerScore} onClose={() => setTrackerFor(null)} title={`${trackerPlayer?.name ?? ""} · hole ${holeNumber}`} tall>
-        {trackerScore && <ThrowTracker score={trackerScore} par={par} onDone={() => setTrackerFor(null)} />}
+        {trackerScore && <ThrowTracker score={trackerScore} par={par} onDone={() => setTrackerFor(null)} onAce={() => trackerPlayer && celebrateAce(trackerPlayer.name)} />}
       </Sheet>
       <Toast message={toast} />
+      <AceParty ace={ace} onDone={() => setAce(null)} />
     </div>
   );
 }
@@ -504,13 +520,14 @@ function MenuItem({ icon, label, onClick, danger }: { icon: React.ReactNode; lab
   );
 }
 
-function ThrowTracker({ score, par, onDone }: { score: HoleScore; par: number; onDone: () => void }) {
+function ThrowTracker({ score, par, onDone, onAce }: { score: HoleScore; par: number; onDone: () => void; onAce: () => void }) {
   const throws = score.throws ?? [];
   const holed = isHoledOut(throws);
   const n = throws.length + 1;
 
   async function add(zone: Zone) {
     if (holed) return;
+    if (zone === "basket" && throws.length === 0) onAce();
     await setThrows(score.id, [...throws, zone]);
   }
   async function undo() {

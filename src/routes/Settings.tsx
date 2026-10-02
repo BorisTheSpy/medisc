@@ -5,7 +5,7 @@ import { useMe, useSetting } from "@/db/hooks";
 import { clearCaches, exportAll, importAll, setSetting, updatePlayer } from "@/db/repo";
 import type { Units } from "@/domain/geo";
 import { Button, Field, PageHeader, Section, Segmented, Toast } from "@/components/ui";
-import { LocateFixed, FileDown, LogOut, UserCheck, RefreshCw } from "lucide-react";
+import { LocateFixed, FileDown, LogOut, UserCheck, RefreshCw, PartyPopper } from "lucide-react";
 import { useUser, login, register, logout } from "@/services/auth";
 import { adoptAccount, syncNow } from "@/services/sync";
 import { usePlayers, useRounds } from "@/db/hooks";
@@ -13,6 +13,8 @@ import { mergePlayerInto } from "@/db/repo";
 import { importUdiscCsv } from "@/db/importUdisc";
 import { getSetting } from "@/db/repo";
 import type { LatLon } from "@/domain/types";
+import { AceParty, type Ace } from "@/celebration/AceParty";
+import { startAceAudio } from "@/celebration/aceAudio";
 
 export function SettingsRoute() {
   const nav = useNavigate();
@@ -22,6 +24,7 @@ export function SettingsRoute() {
   const [name, setName] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [geoTest, setGeoTest] = useState<string>("");
+  const [ace, setAce] = useState<Ace | null>(null);
 
   async function testLocation() {
     const lines: string[] = [];
@@ -254,7 +257,13 @@ export function SettingsRoute() {
               ]}
             />
           </Row>
+          <Row label="Ace party">
+            <Button size="sm" onClick={() => setAce({ playerName: me?.name ?? "You", holeNumber: 7, stopAudio: startAceAudio() })}>
+              <PartyPopper size={14} /> Preview
+            </Button>
+          </Row>
         </div>
+        <p className="mt-2 text-xs text-ink-3">Confetti, a dancer and sound every time someone aces a hole. Add your own sound files under public/ace in the project to replace the built-in ones.</p>
       </Section>
 
       <Section title="Import from UDisc" className="mt-6">
@@ -303,6 +312,7 @@ export function SettingsRoute() {
         </p>
       </Section>
       <Toast message={toast} />
+      <AceParty ace={ace} onDone={() => setAce(null)} />
     </div>
   );
 }

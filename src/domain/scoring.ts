@@ -59,3 +59,9 @@ export function roundTotals(scores: HoleScore[]): Map<string, PlayerTotals> {
 export function isHoledOut(throws: Zone[] | undefined): boolean {
   return !!throws && throws[throws.length - 1] === "basket";
 }
+
+/** The stroke count after one tap of + or −: a fresh hole jumps to par or a birdie, then one at a time, never below one. */
+export function nextStrokes(strokes: number, par: number, delta: number): number {
+  if (strokes === 0) return delta > 0 ? par : Math.max(1, par - 1);
+  return Math.max(1, strokes + delta);
+}
