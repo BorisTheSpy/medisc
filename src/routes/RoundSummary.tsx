@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { Share2, Trash2, Play, Trophy, Pencil } from "lucide-react";
+import { Share2, Trash2, Play, Trophy, Pencil, Send, Check } from "lucide-react";
+import { useUser } from "@/services/auth";
+import { roundRecipients } from "@/domain/sync";
 import { useCourse, usePlayers, useRound, useRoundScores } from "@/db/hooks";
 import { deleteRound, reopenRound, updateRound } from "@/db/repo";
 import { formatToPar, roundTotals } from "@/domain/scoring";
@@ -19,6 +21,12 @@ export function RoundSummaryRoute() {
   const course = useCourse(round?.courseId);
   const [nameOpen, setNameOpen] = useState(false);
   const [name, setName] = useState("");
+  const [sendOpen, setSendOpen] = useState(false);
+  const [sendPick, setSendPick] = useState<string[]>([]);
+  const user = useUser();
+  const friends = useMemo(() => players.filter((p) => p.username && p.id !== user?.id && !p.deletedAt), [players, user]);
+  const recipients = useMemo(() => (round ? new Set(roundRecipients(round)) : new Set<string>()), [round]);
+  const sharedNames = useMemo(() => friends.filter((f) => recipients.has(f.id)).map((f) => f.name), [friends, recipients]);
 
   const totals = useMemo(() => roundTotals(scores), [scores]);
   const cardPlayers = useMemo(() => (round ? round.playerIds.map((pid) => players.find((p) => p.id === pid)).filter((p): p is Player => !!p) : []), [round, players]);
@@ -82,6 +90,17 @@ export function RoundSummaryRoute() {
     nav("/rounds", { replace: true });
   }
 
+  function openSend() {
+    setSendPick([]);
+    setSendOpen(true);
+  }
+
+  async function send() {
+    if (!round || sendPick.length === 0) return;
+    await updateRound(round.id, { sharedWith: [...new Set([...(round.sharedWith ?? []), ...sendPick])] });
+    setSendOpen(false);
+  }
+
   async function continueScoring() {
     await reopenRound(round!.id);
     nav(`/rounds/${round!.id}/play`, { replace: true });
@@ -110,6 +129,23 @@ export function RoundSummaryRoute() {
           </>
         }
       />
+
+      {user && (
+        <div className="mx-4 mb-3 flex items-center justify-between gap-3 rounded-card bg-surface px-4 py-3">
+          <div className="min-w-0 text-sm">
+            {sharedNames.length > 0 ? (
+              <>
+                <span className="font-semibold">In {sharedNames.join(", ")}&rsquo;s app too.</span> <span className="text-ink-3">Scores sync both ways.</span>
+              </>
+            ) : (
+              <span className="text-ink-3">Only on your account.</span>
+            )}
+          </div>
+          <Button size="sm" onClick={openSend} disabled={friends.filter((f) => !recipients.has(f.id)).length === 0} title={friends.length === 0 ? "Add friends in Settings first" : undefined}>
+            <Send size={14} /> Send to a friend
+          </Button>
+        </div>
+      )}
 
       {!round.finishedAt && (
         <div className="mx-4 mb-3 flex items-center justify-between rounded-card bg-brand px-4 py-3 text-brand-ink">
@@ -223,6 +259,35 @@ export function RoundSummaryRoute() {
           </button>
         )}
       </Section>
+
+      <Sheet open={sendOpen} onClose={() => setSendOpen(false)} title="Send this round">
+        <p className="mb-3 text-sm text-ink-2">The round lands in their Rounds list and stays in sync. If they played as a guest, link that guest to their account in Settings so it counts in their stats.</p>
+        <div className="overflow-hidden rounded-card bg-surface-2">
+          {friends.map((f) => {
+            const already = recipients.has(f.id);
+            const on = already || sendPick.includes(f.id);
+            return (
+              <button
+                key={f.id}
+                disabled={already}
+                onClick={() => setSendPick((s) => (s.includes(f.id) ? s.filter((x) => x !== f.id) : [...s, f.id]))}
+                className={cx("flex w-full items-center gap-3 border-b hairline px-4 py-3 text-left last:border-b-0 disabled:opacity-60", on && "bg-surface-3")}
+              >
+                <Avatar name={f.name} color={f.color} size={32} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium">{f.name}</div>
+                  <div className="text-xs text-ink-3">@{f.username}{already ? " · already has it" : ""}</div>
+                </div>
+                {on && <Check size={18} className="text-live" />}
+              </button>
+            );
+          })}
+          {friends.length === 0 && <div className="px-4 py-3 text-sm text-ink-3">No friends yet. Add them in Settings.</div>}
+        </div>
+        <Button variant="primary" size="lg" full className="mt-4" disabled={sendPick.length === 0} onClick={send}>
+          <Send size={16} /> Send
+        </Button>
+      </Sheet>
 
       <Sheet open={nameOpen} onClose={() => setNameOpen(false)} title="Name this round">
         <form

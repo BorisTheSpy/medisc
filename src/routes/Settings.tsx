@@ -4,8 +4,8 @@ import { Download, Upload, Trash2 } from "lucide-react";
 import { useMe, useSetting } from "@/db/hooks";
 import { clearCaches, exportAll, importAll, setSetting, updatePlayer } from "@/db/repo";
 import type { Units } from "@/domain/geo";
-import { Button, Field, IconButton, PageHeader, Section, Segmented, Toast } from "@/components/ui";
-import { LocateFixed, FileDown, LogOut, UserCheck, RefreshCw, PartyPopper, UserMinus, UserPlus } from "lucide-react";
+import { Avatar, Button, Field, IconButton, PageHeader, Section, Segmented, Sheet, Toast } from "@/components/ui";
+import { LocateFixed, FileDown, LogOut, UserCheck, RefreshCw, PartyPopper, UserMinus, UserPlus, Link2 } from "lucide-react";
 import { addFriend, listFriends, removeFriend } from "@/services/friends";
 import type { Person } from "@/domain/sync";
 import { useUser, login, register, logout } from "@/services/auth";
@@ -63,6 +63,19 @@ export function SettingsRoute() {
   const [friendUser, setFriendUser] = useState("");
   const [friendError, setFriendError] = useState<string | null>(null);
   const [friendBusy, setFriendBusy] = useState(false);
+  const [linkGuest, setLinkGuest] = useState<string | null>(null);
+  const friendPlayers = players.filter((p) => p.username && !p.isMe && !p.deletedAt);
+
+  /** Fold a guest into a friend's account: their old rounds re-key to the friend and sync to them. */
+  async function linkGuestTo(friendId: string) {
+    const guest = players.find((p) => p.id === linkGuest);
+    const friend = players.find((p) => p.id === friendId);
+    if (!guest || !friend) return;
+    if (!confirm(`Treat "${guest.name}" as ${friend.name} (@${friend.username})? Their ${roundsWith(guest.id)} rounds move to ${friend.name}'s account.`)) return;
+    await mergePlayerInto(guest.id, friend.id);
+    setLinkGuest(null);
+    notify(`${guest.name} is now ${friend.name}. Their rounds will sync over.`);
+  }
 
   useEffect(() => {
     if (!user) {
@@ -299,9 +312,16 @@ export function SettingsRoute() {
                   </div>
                 </div>
                 {!p.username && (
-                  <Button size="sm" variant="ghost" onClick={() => thisIsMe(p.id)} title="Count this player's rounds as yours">
-                    <UserCheck size={14} /> This is me
-                  </Button>
+                  <div className="flex shrink-0 gap-1">
+                    {friendPlayers.length > 0 && (
+                      <IconButton label={`Link ${p.name} to a friend's account`} onClick={() => setLinkGuest(p.id)}>
+                        <Link2 size={18} />
+                      </IconButton>
+                    )}
+                    <Button size="sm" variant="ghost" onClick={() => thisIsMe(p.id)} title="Count this player's rounds as yours">
+                      <UserCheck size={14} /> This is me
+                    </Button>
+                  </div>
                 )}
               </div>
             ))}
@@ -386,6 +406,20 @@ export function SettingsRoute() {
           Course data © OpenStreetMap contributors (ODbL). Course data supplied by DiscGolfAPI. Course locations may be powered by Google. Basemap by OpenFreeMap. Satellite imagery © Esri and partners. Medisc is an independent project and is not affiliated with UDisc.
         </p>
       </Section>
+      <Sheet open={linkGuest !== null} onClose={() => setLinkGuest(null)} title={`${players.find((p) => p.id === linkGuest)?.name ?? "Guest"} is which friend?`}>
+        <p className="mb-3 text-sm text-ink-2">Every round this guest played moves to the friend you pick and shows up in their app, counting toward their stats.</p>
+        <div className="overflow-hidden rounded-card bg-surface-2">
+          {friendPlayers.map((f) => (
+            <button key={f.id} onClick={() => linkGuestTo(f.id)} className="flex w-full items-center gap-3 border-b hairline px-4 py-3 text-left last:border-b-0 active:bg-surface-3">
+              <Avatar name={f.name} color={f.color} size={32} />
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">{f.name}</div>
+                <div className="text-xs text-ink-3">@{f.username}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </Sheet>
       <Toast message={toast} />
       <AceParty ace={ace} onDone={() => setAce(null)} />
     </div>

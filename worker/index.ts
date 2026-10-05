@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { mergeRoundDocs, type Person, type RoundDoc } from "../src/domain/sync";
+import { mergeRoundDocs, roundRecipients, type Person, type RoundDoc } from "../src/domain/sync";
 
 type Env = { ASSETS: Fetcher; GOOGLE_PLACES_KEY?: string; DB?: D1Database };
 
@@ -936,7 +936,7 @@ app.post("/api/sync", async (c) => {
     }
     const payload = JSON.stringify(merged);
     if (payload.length > 400_000) continue;
-    const members = await accountIds(db, merged.playerIds);
+    const members = await accountIds(db, roundRecipients(merged));
     members.add(owner);
     await db.batch([
       db.prepare("INSERT INTO sync_rounds (id, user_id, payload, updated_at) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at").bind(incoming.id, owner, payload, now),

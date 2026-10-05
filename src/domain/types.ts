@@ -101,6 +101,8 @@ export interface Round extends Timestamps {
   trackThrows: boolean;
   name?: string;
   notes?: string;
+  /** Account ids this round was sent to, beyond the accounts on the card. */
+  sharedWith?: string[];
 }
 
 export interface HoleScore {

@@ -76,5 +76,7 @@ describe("isSharedRound", () => {
     expect(isSharedRound({ playerIds: ["me", "friend"] }, accounts, "me")).toBe(true);
     expect(isSharedRound({ playerIds: ["me", "guest"] }, accounts, "me")).toBe(false);
     expect(isSharedRound({ playerIds: ["me"] }, accounts, "me")).toBe(false);
+    expect(isSharedRound({ playerIds: ["me", "guest"], sharedWith: ["friend"] }, accounts, "me")).toBe(true);
+    expect(isSharedRound({ playerIds: ["me"], sharedWith: ["stranger"] }, accounts, "me")).toBe(false);
   });
 });

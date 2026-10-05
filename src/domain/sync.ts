@@ -58,7 +58,12 @@ export function mergeRoundDocs(a: RoundDoc, b: RoundDoc): RoundDoc {
   };
 }
 
-/** True when the card carries any account holder other than `myId`. */
-export function isSharedRound(round: Pick<Round, "playerIds">, accountIds: Set<string>, myId: string | undefined): boolean {
-  return round.playerIds.some((id) => id !== myId && accountIds.has(id));
+/** Every account that should hold this round: accounts on the card plus anyone it was sent to. */
+export function roundRecipients(round: Pick<Round, "playerIds" | "sharedWith">): string[] {
+  return [...new Set([...round.playerIds, ...(round.sharedWith ?? [])])];
+}
+
+/** True when another account holder than `myId` is on the card or was sent the round. */
+export function isSharedRound(round: Pick<Round, "playerIds" | "sharedWith">, accountIds: Set<string>, myId: string | undefined): boolean {
+  return roundRecipients(round).some((id) => id !== myId && accountIds.has(id));
 }
