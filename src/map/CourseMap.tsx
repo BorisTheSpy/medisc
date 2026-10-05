@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { setWorkerUrl, Map as MLMap, Marker, LngLatBounds, type StyleSpecification, type GeoJSONSource } from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
-import { Compass, Crosshair, Layers } from "lucide-react";
+import { Compass, Crosshair, Flag, Layers } from "lucide-react";
 import type { Hole, LatLon } from "@/domain/types";
 import { bearingDeg, haversineM } from "@/domain/geo";
 import { useCompass } from "@/services/useCompass";
@@ -120,6 +120,11 @@ export function CourseMap({ center, holes = [], activeHole, user, satellite = fa
   const userRef = useRef<Marker | null>(null);
   const userElRef = useRef<HTMLDivElement | null>(null);
   const compass = useCompass(user?.heading);
+  /** True once the player pans or zooms by hand; the camera then stays put until the hole changes. */
+  const [explored, setExplored] = useState(false);
+  const exploredRef = useRef(false);
+  const userPosRef = useRef(user);
+  userPosRef.current = user;
   const [ready, setReady] = useState(0);
   const [failed, setFailed] = useState<string | null>(null);
   const styleFailed = useRef(false);
@@ -165,6 +170,12 @@ export function CourseMap({ center, holes = [], activeHole, user, satellite = fa
       setReady((n) => n + 1);
     });
     map.on("click", (e) => onMapClickRef.current?.({ lat: e.lngLat.lat, lon: e.lngLat.lng }));
+    // Only gestures carry an originalEvent; our own easeTo and fitBounds calls do not.
+    map.on("movestart", (e) => {
+      if (!(e as { originalEvent?: unknown }).originalEvent || exploredRef.current) return;
+      exploredRef.current = true;
+      setExplored(true);
+    });
     return () => {
       map.remove();
       mapRef.current = null;
@@ -259,23 +270,38 @@ export function CourseMap({ center, holes = [], activeHole, user, satellite = fa
     marker.setRotation(compass.heading);
   }, [compass.heading, user, ready]);
 
-  useEffect(() => {
+  /**
+   * What the camera should frame, as a string. GPS updates are deliberately not part of it, so a
+   * walking player's position never yanks the view. It changes when the hole, its pins, or the
+   * requested view change.
+   */
+  const fitKey = useMemo(() => {
+    const pt = (p?: LatLon) => (p ? `${p.lat.toFixed(6)},${p.lon.toFixed(6)}` : "-");
+    if (fitOn === "none") return `none|${center.lat}|${center.lon}|${zoom ?? ""}`;
+    if (fitOn === "active") {
+      const h = holes.find((x) => x.number === activeHole);
+      return `active|${activeHole}|${pt(h?.tee)}|${pt(h?.basket)}|${(h?.path ?? []).map(pt).join(";")}|${center.lat}|${center.lon}`;
+    }
+    return `holes|${holes.map((h) => `${pt(h.tee)}>${pt(h.basket)}`).join(";")}|${center.lat}|${center.lon}`;
+  }, [fitOn, activeHole, holes, center.lat, center.lon, zoom]);
+
+  function fitView(animate = true) {
     const map = mapRef.current;
-    if (!map || !ready) return;
+    if (!map) return;
+    const duration = animate ? 450 : 0;
     if (fitOn === "none") {
-      map.easeTo({ center: [center.lon, center.lat], zoom: zoom ?? map.getZoom(), duration: 400 });
+      map.easeTo({ center: [center.lon, center.lat], zoom: zoom ?? map.getZoom(), duration });
       return;
     }
     const pts: LatLon[] = [];
+    const me = userPosRef.current;
     if (fitOn === "active" && activeHole !== undefined) {
       const h = holes.find((x) => x.number === activeHole);
       if (h?.tee) pts.push(h.tee);
       if (h?.basket) pts.push(h.basket);
       if (h?.path) pts.push(...h.path);
-      if (user && h?.tee && h?.basket) {
-        const d = Math.hypot(user.lat - h.tee.lat, user.lon - h.tee.lon);
-        if (d < 0.01) pts.push(user);
-      }
+      // Include the player only when they are actually around this hole.
+      if (me && h?.tee && h?.basket && haversineM(me, h.tee) < 400) pts.push(me);
     } else {
       for (const h of holes) {
         if (h.tee) pts.push(h.tee);
@@ -283,21 +309,47 @@ export function CourseMap({ center, holes = [], activeHole, user, satellite = fa
       }
     }
     if (pts.length === 0) {
-      map.easeTo({ center: [center.lon, center.lat], zoom: zoom ?? 15, duration: 400 });
+      map.easeTo({ center: [center.lon, center.lat], zoom: zoom ?? 15, duration });
       return;
     }
     if (pts.length === 1) {
-      map.easeTo({ center: [pts[0].lon, pts[0].lat], zoom: 17, duration: 400 });
+      map.easeTo({ center: [pts[0].lon, pts[0].lat], zoom: 17, duration });
       return;
     }
     const b = new LngLatBounds();
     for (const p of pts) b.extend([p.lon, p.lat]);
-    map.fitBounds(b, { padding: fitOn === "active" ? 60 : 40, maxZoom: 18, duration: 500 });
-  }, [fitOn, activeHole, holes, ready, center.lat, center.lon, zoom, user?.lat, user?.lon]);
+    map.fitBounds(b, { padding: fitOn === "active" ? 60 : 40, maxZoom: 18, duration });
+  }
+
+  function backToHole() {
+    exploredRef.current = false;
+    setExplored(false);
+    fitView();
+  }
+
+  // A new hole (or new pins, or a new requested view) resets exploring and frames it.
+  useEffect(() => {
+    if (!mapRef.current || !ready) return;
+    exploredRef.current = false;
+    setExplored(false);
+    fitView();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitKey, ready]);
+
+  // The first GPS fix may bring the player into frame, unless they are already looking around.
+  const hasFix = !!user;
+  useEffect(() => {
+    if (!hasFix || !mapRef.current || !ready || exploredRef.current || fitOn !== "active") return;
+    fitView();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasFix]);
 
   function recenter() {
     const map = mapRef.current;
     if (!map) return;
+    // Looking at yourself is still exploring: the camera should not snap back on the next fix.
+    exploredRef.current = true;
+    setExplored(true);
     if (user) map.easeTo({ center: [user.lon, user.lat], zoom: Math.max(map.getZoom(), 17) });
     else map.easeTo({ center: [center.lon, center.lat] });
   }
@@ -327,6 +379,11 @@ export function CourseMap({ center, holes = [], activeHole, user, satellite = fa
         <button aria-label="Center on me" onClick={recenter} className="grid h-10 w-10 place-items-center rounded-full border border-line-strong bg-surface text-ink">
           <Crosshair size={18} />
         </button>
+        {explored && fitOn !== "none" && (
+          <button aria-label={fitOn === "active" && activeHole !== undefined ? `Back to hole ${activeHole}` : "Show all holes"} onClick={backToHole} className="grid h-10 w-10 place-items-center rounded-full border border-live bg-live text-on-live">
+            <Flag size={18} />
+          </button>
+        )}
         {compass.supported && compass.needsPermission && (
           <button aria-label="Show which way I am facing" onClick={() => void compass.request()} className="grid h-10 w-10 place-items-center rounded-full border border-live bg-surface text-live">
             <Compass size={18} />
